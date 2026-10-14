@@ -6,7 +6,7 @@ import { auth } from "@/server/container"
 import { getSession } from "@/server/session"
 
 export const metadata: Metadata = {
-  title: "Sign up · Ace",
+  title: "Create your Ace account",
 }
 
 export default async function SignUpPage({

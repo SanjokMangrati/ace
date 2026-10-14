@@ -1,14 +1,21 @@
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist_Mono, Onest, Parkinsans } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
+const onest = Onest({ subsets: ["latin"], variable: "--font-onest" })
 
-const fontMono = Geist_Mono({
+const parkinsans = Parkinsans({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-parkinsans",
+  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
+  adjustFontFallback: false,
+})
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
 })
 
 export default function RootLayout({
@@ -20,12 +27,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn(
-        "antialiased",
-        fontMono.variable,
-        "font-sans",
-        geist.variable
-      )}
+      className={cn(onest.variable, parkinsans.variable, geistMono.variable)}
     >
       <body>
         <ThemeProvider>{children}</ThemeProvider>
