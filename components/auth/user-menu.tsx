@@ -1,6 +1,6 @@
 "use client"
 
-import { LogOutIcon } from "lucide-react"
+import { SignOutIcon } from "@phosphor-icons/react/ssr"
 import { useTransition } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -42,7 +42,7 @@ export function UserMenu({ user }: { user: AuthUser }) {
           <Button variant="ghost" size="icon" aria-label="Account menu" />
         }
       >
-        <Avatar>
+        <Avatar kind="you" size="sm">
           {user.image && <AvatarImage src={user.image} alt={user.name} />}
           <AvatarFallback>{initials(user.name)}</AvatarFallback>
         </Avatar>
@@ -50,14 +50,16 @@ export function UserMenu({ user }: { user: AuthUser }) {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex flex-col">
-            <span className="truncate text-foreground">{user.name}</span>
-            <span className="truncate font-normal">{user.email}</span>
+            <span className="truncate text-body-strong text-ink">
+              {user.name}
+            </span>
+            <span className="truncate">{user.email}</span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem disabled={pending} onClick={signOut}>
-            <LogOutIcon />
+            <SignOutIcon weight="duotone" />
             Sign out
           </DropdownMenuItem>
         </DropdownMenuGroup>

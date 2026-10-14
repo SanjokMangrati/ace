@@ -7,15 +7,17 @@ import { Spinner } from "@/components/ui/spinner"
 export function SubmitButton<TValues extends FieldValues>({
   control,
   children,
+  className,
 }: {
   control: Control<TValues>
   children: React.ReactNode
+  className?: string
 }) {
   const { isSubmitting, isSubmitSuccessful } = useFormState({ control })
   const pending = isSubmitting || isSubmitSuccessful
 
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={pending} className={className}>
       {pending && <Spinner data-icon="inline-start" />}
       {children}
     </Button>

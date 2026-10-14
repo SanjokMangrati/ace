@@ -1,24 +1,13 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { FormError } from "@/components/form/form-error"
+import { PasswordField } from "@/components/form/password-field"
 import { SubmitButton } from "@/components/form/submit-button"
 import { TextField } from "@/components/form/text-field"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldSeparator,
-} from "@/components/ui/field"
+import { FieldSeparator } from "@/components/ui/field"
+import { TextLink } from "@/components/ui/text-link"
 import {
   PASSWORD_MIN_LENGTH,
   type SignUpInput,
@@ -26,6 +15,7 @@ import {
 } from "@/lib/auth-schemas"
 import type { SocialProvider } from "@/server/ports/auth"
 import { authClient, authErrorMessage } from "./auth-client"
+import { AUTH_TITLE_ID, AuthHeader } from "./auth-header"
 import { SocialSignIn } from "./social-sign-in"
 
 export function SignUpForm({
@@ -53,54 +43,51 @@ export function SignUpForm({
     next === "/" ? "/sign-in" : `/sign-in?next=${encodeURIComponent(next)}`
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl">Create your account</CardTitle>
-        <CardDescription>Start building AI teammates with Ace</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
-          <FieldGroup>
-            <FormError control={form.control} />
-            {providers.length > 0 && (
-              <>
-                <SocialSignIn providers={providers} next={next} />
-                <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
-                  Or continue with
-                </FieldSeparator>
-              </>
-            )}
-            <TextField
-              control={form.control}
-              name="name"
-              label="Name"
-              autoComplete="name"
-            />
-            <TextField
-              control={form.control}
-              name="email"
-              label="Email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-            />
-            <TextField
-              control={form.control}
-              name="password"
-              label="Password"
-              type="password"
-              autoComplete="new-password"
-              description={`At least ${PASSWORD_MIN_LENGTH} characters.`}
-            />
-            <Field>
-              <SubmitButton control={form.control}>Create account</SubmitButton>
-              <FieldDescription className="text-center">
-                Already have an account? <Link href={signInHref}>Sign in</Link>
-              </FieldDescription>
-            </Field>
-          </FieldGroup>
-        </form>
-      </CardContent>
-    </Card>
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      noValidate
+      aria-labelledby={AUTH_TITLE_ID}
+      className="flex flex-col gap-5"
+    >
+      <AuthHeader
+        title="Create your account"
+        description="Next, you'll set up your first teammate."
+      />
+      <FormError control={form.control} />
+      <TextField
+        control={form.control}
+        name="name"
+        label="Your name"
+        autoComplete="name"
+        placeholder="Sam Rivera"
+      />
+      <TextField
+        control={form.control}
+        name="email"
+        label="Email"
+        type="email"
+        autoComplete="email"
+        placeholder="you@example.com"
+      />
+      <PasswordField
+        control={form.control}
+        name="password"
+        label="Password"
+        autoComplete="new-password"
+        description={`At least ${PASSWORD_MIN_LENGTH} characters.`}
+      />
+      <SubmitButton control={form.control} className="w-full">
+        Create account
+      </SubmitButton>
+      {providers.length > 0 && (
+        <>
+          <FieldSeparator>or</FieldSeparator>
+          <SocialSignIn providers={providers} next={next} />
+        </>
+      )}
+      <p className="mt-1 text-center text-ink-2">
+        Already have an account? <TextLink href={signInHref}>Sign in</TextLink>
+      </p>
+    </form>
   )
 }

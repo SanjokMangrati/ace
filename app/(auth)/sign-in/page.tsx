@@ -6,7 +6,7 @@ import { auth } from "@/server/container"
 import { getSession } from "@/server/session"
 
 export const metadata: Metadata = {
-  title: "Sign in · Ace",
+  title: "Sign in to Ace",
 }
 
 const oauthErrors: Record<string, string> = {

@@ -16,7 +16,7 @@ export function FormError<TValues extends FieldValues>({
   if (!message) return null
 
   return (
-    <Alert variant="destructive">
+    <Alert variant="danger">
       <AlertDescription>{message}</AlertDescription>
     </Alert>
   )
