@@ -1,4 +1,5 @@
 import { loadEnvConfig } from "@next/env"
+import { additionalPackages } from "@trigger.dev/build/extensions/core"
 import { defineConfig } from "@trigger.dev/sdk"
 
 loadEnvConfig(process.cwd())
@@ -12,5 +13,8 @@ export default defineConfig({
   maxDuration: 3600,
   build: {
     conditions: ["react-server"],
+    extensions: [
+      additionalPackages({ packages: ["form-data@4.0.6", "busboy@1.6.0"] }),
+    ],
   },
 })

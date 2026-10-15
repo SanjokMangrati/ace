@@ -5,8 +5,13 @@ allowBuilds:
   unrs-resolver: true
   msw: false
   esbuild: true
+  protobufjs: false
 
 minimumReleaseAgeExclude:
   - '@trigger.dev/core@4.7.4'
   - '@trigger.dev/sdk@4.7.4'
   - '@trigger.dev/build@4.7.4'
+  - '@daytona/analytics-api-client@0.224.1'
+  - '@daytona/api-client@0.224.1'
+  - '@daytona/sdk@0.224.1'
+  - '@daytona/toolbox-api-client@0.224.1'

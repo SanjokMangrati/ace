@@ -20,8 +20,8 @@ export async function addProviderKey(
   const user = await requireUser()
   const parsed = providerKeyFormSchema.safeParse(values)
   if (!parsed.success) return zodFailure(parsed.error)
-  const sealed = sealProviderKey(parsed.data)
-  if (!sealed.ok) return fail(sealed.message, "provider")
+  const sealed = await sealProviderKey(parsed.data)
+  if (!sealed.ok) return sealed
 
   await insertProviderKey({ ...sealed.key, userId: user.id })
 

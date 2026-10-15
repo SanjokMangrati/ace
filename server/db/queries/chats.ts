@@ -89,6 +89,14 @@ export async function ownsChat(userId: string, id: string) {
   return rows.length > 0
 }
 
+export async function listBotChatIds(userId: string, botId: string) {
+  const rows = await db
+    .select({ id: chat.id })
+    .from(chat)
+    .where(and(eq(chat.botId, botId), eq(chat.userId, userId)))
+  return rows.map((row) => row.id)
+}
+
 export async function insertChat(
   userId: string,
   values: { id: string; botId: string; title: string }

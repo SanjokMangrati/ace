@@ -53,6 +53,10 @@
                 "message": "Import Better Auth only from server/adapters/better-auth. Use the AuthPort from @/server/container."
               },
               {
+                "group": ["@daytona/**"],
+                "message": "Import Daytona only from server/adapters/daytona. Use the SandboxProvider port from @/server/container."
+              },
+              {
                 "group": ["@trigger.dev/**"],
                 "message": "Import Trigger.dev only from server/adapters/trigger, trigger/, or components/chat/use-chat-transport.ts. Use the ChatRuntime port from @/server/container."
               }
@@ -104,6 +108,16 @@
         "trigger.config.ts",
         "components/chat/use-chat-transport.ts"
       ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["server/adapters/daytona/**"],
       "linter": {
         "rules": {
           "style": {

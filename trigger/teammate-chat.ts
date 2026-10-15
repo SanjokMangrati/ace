@@ -4,6 +4,7 @@ import { TEAMMATE_CHAT_TASK, type TeammateMessage } from "@/lib/chat"
 import { providerLabel } from "@/lib/models"
 import { createAiGatewayCatalog } from "@/server/adapters/ai-gateway"
 import { createAiSdkModels } from "@/server/adapters/ai-sdk"
+import { createDaytonaSandboxes } from "@/server/adapters/daytona"
 import { createEnvKeyVault } from "@/server/adapters/env-key-vault"
 import { postgresTranscriptStorage } from "@/server/adapters/trigger/transcript-storage"
 import {
@@ -11,11 +12,14 @@ import {
   DAY_MS,
   endReason,
   type Price,
+  type SandboxUse,
+  sandboxCostUsd,
   totalUsage,
   turnNotice,
 } from "@/server/agent/limits"
 import { noteTools } from "@/server/agent/notes"
 import { systemPrompt } from "@/server/agent/prompt"
+import { sandboxTools } from "@/server/agent/sandbox-tools"
 import {
   endRunningTurns,
   findChatContext,
@@ -24,14 +28,18 @@ import {
   startTurn,
   type TurnEndReason,
 } from "@/server/db/queries/chats"
+import { saveSandbox } from "@/server/db/queries/sandboxes"
 import { env } from "@/server/env"
+import type { Sandbox } from "@/server/ports/sandbox"
 
 const models = createAiSdkModels()
 const keyVault = createEnvKeyVault(env.ENCRYPTION_KEY)
 const modelCatalog = createAiGatewayCatalog()
+const sandboxes = createDaytonaSandboxes(env.DAYTONA_SNAPSHOT)
 
 type Turn = {
   id: string
+  botId: string
   price: Price | undefined
   maxSteps: number
   taskBudgetUsd: number
@@ -43,9 +51,38 @@ type Turn = {
   }[]
   failed: boolean
   reason?: TurnEndReason
+  sandbox?: Promise<Sandbox>
+  sandboxUse?: SandboxUse
 }
 
 const turn = chat.local<{ current: Turn | null }>({ id: "turn" })
+
+function turnCostUsd(current: Turn, steps: Turn["steps"]) {
+  return (
+    costUsd(current.price, totalUsage(steps)) +
+    sandboxCostUsd(current.sandboxUse, Date.now())
+  )
+}
+
+function openSandbox() {
+  const current = turn.current
+  if (!current) throw new Error("No turn is running.")
+  current.sandbox ??= (async () => {
+    const since = Date.now()
+    const sandbox = await sandboxes.open(current.botId)
+    current.sandboxUse = { since, usdPerHour: sandbox.usdPerHour }
+    await saveSandbox({
+      botId: current.botId,
+      provider: sandboxes.name,
+      providerRef: sandbox.ref,
+    })
+    return sandbox
+  })().catch((error) => {
+    current.sandbox = undefined
+    throw error
+  })
+  return current.sandbox
+}
 
 export const teammateChat = chat
   .withUIMessage<TeammateMessage>({
@@ -60,7 +97,10 @@ export const teammateChat = chat
   .agent({
     id: TEAMMATE_CHAT_TASK,
     storage: postgresTranscriptStorage,
-    tools: ({ chatId }) => noteTools(chatId),
+    tools: ({ chatId }) => ({
+      ...noteTools(chatId),
+      ...sandboxTools(openSandbox),
+    }),
     onBoot: () => {
       turn.init({ current: null })
     },
@@ -77,6 +117,7 @@ export const teammateChat = chat
 
       const current: Turn = {
         id: await startTurn(chatId, bot.id),
+        botId: bot.id,
         price: await modelCatalog.find(key.provider, bot.modelId),
         maxSteps: bot.maxSteps,
         taskBudgetUsd: bot.taskBudgetUsd,
@@ -109,8 +150,7 @@ export const teammateChat = chat
         abortSignal: signal,
         stopWhen: [
           isStepCount(bot.maxSteps),
-          ({ steps }) =>
-            costUsd(current.price, totalUsage(steps)) >= bot.taskBudgetUsd,
+          ({ steps }) => turnCostUsd(current, steps) >= bot.taskBudgetUsd,
         ],
         onStepFinish: (step) => {
           current.steps.push(step)
@@ -126,7 +166,7 @@ export const teammateChat = chat
       turn.current = null
 
       const usage = totalUsage(current.steps)
-      const cost = costUsd(current.price, usage)
+      const cost = turnCostUsd(current, current.steps)
       const reason =
         current.reason ??
         endReason({

@@ -16,7 +16,7 @@ import {
   teammateFormSchema,
 } from "@/lib/bot-schemas"
 import type { Provider } from "@/lib/models"
-import { modelCatalog } from "@/server/container"
+import { chatRuntime, modelCatalog, sandboxes } from "@/server/container"
 import {
   type BotInput,
   type BotKey,
@@ -25,7 +25,9 @@ import {
   insertBot,
   updateBot,
 } from "@/server/db/queries/bots"
+import { listBotChatIds } from "@/server/db/queries/chats"
 import { findProviderKey } from "@/server/db/queries/provider-keys"
+import { findBotSandbox } from "@/server/db/queries/sandboxes"
 import { readPicture } from "@/server/picture"
 import { sealProviderKey } from "@/server/seal-provider-key"
 import { requireUser } from "@/server/session"
@@ -40,8 +42,9 @@ async function resolveKey(
   input: TeammateFormInput
 ): Promise<{ ok: true; key: BotKey; provider: Provider } | TeammateFailure> {
   if (input.providerKeyId === NEW_KEY) {
-    const sealed = sealProviderKey(input.newKey)
-    if (!sealed.ok) return fail(sealed.message, "newKey.provider")
+    const sealed = await sealProviderKey(input.newKey)
+    if (!sealed.ok)
+      return fail(sealed.message, `newKey.${sealed.field ?? "provider"}`)
     return {
       ok: true,
       key: { create: sealed.key },
@@ -141,9 +144,12 @@ export async function updateTeammate(
 export async function deleteTeammate(botId: string): Promise<Failure> {
   const user = await requireUser()
   const id = botIdSchema.safeParse(botId)
-  if (!id.success || !(await deleteBot(user.id, id.data))) {
-    return fail(TEAMMATE_NOT_FOUND)
-  }
+  if (!id.success) return fail(TEAMMATE_NOT_FOUND)
+  const chatIds = await listBotChatIds(user.id, id.data)
+  await Promise.all(chatIds.map((chatId) => chatRuntime.closeSession(chatId)))
+  const sandbox = await findBotSandbox(user.id, id.data)
+  if (sandbox) await sandboxes.destroy(sandbox.providerRef)
+  if (!(await deleteBot(user.id, id.data))) return fail(TEAMMATE_NOT_FOUND)
 
   revalidatePath("/", "layout")
   redirect("/teammates")

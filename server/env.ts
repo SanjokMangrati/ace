@@ -24,6 +24,8 @@ const schema = z
       }),
     ALLOW_CUSTOM_BASE_URL: z.stringbool().default(true),
     TRIGGER_SECRET_KEY: z.string().min(1),
+    DAYTONA_API_KEY: z.string().min(1),
+    DAYTONA_SNAPSHOT: z.string().min(1).default("ace-desktop"),
   })
   .refine((env) => !env.GITHUB_CLIENT_ID === !env.GITHUB_CLIENT_SECRET, {
     message: "Set both GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or neither.",

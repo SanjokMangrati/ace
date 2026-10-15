@@ -7,7 +7,17 @@ type StepState = "running" | "done" | "failed"
 export type Step = { key: string; state: StepState } & (
   | { kind: "think" }
   | { kind: "remember" | "forget"; content?: string }
+  | { kind: "command"; purpose?: string; command?: string; output?: string }
+  | { kind: "read" | "save" | "look"; name?: string }
 )
+
+const HOME = new Set(["", ".", "./", "~", "~/"])
+
+function fileName(path: string | undefined) {
+  if (path === undefined) return undefined
+  if (HOME.has(path.trim())) return "the home folder"
+  return path.split("/").filter(Boolean).at(-1) ?? path
+}
 
 function toolState(state: string): StepState {
   if (state === "output-available") return "done"
@@ -38,6 +48,40 @@ function stepOf(part: Part, index: number): Step | null {
         state: toolState(part.state),
         content:
           part.state === "output-available" ? part.output.content : undefined,
+      }
+    case "tool-shell":
+      return {
+        key: part.toolCallId,
+        kind: "command",
+        state: toolState(part.state),
+        purpose: part.input?.purpose,
+        command: part.input?.command,
+        output:
+          part.state === "output-available" ? part.output.output : undefined,
+      }
+    case "tool-fs_read":
+      return {
+        key: part.toolCallId,
+        kind: "read",
+        state: toolState(part.state),
+        name: fileName(part.input?.path),
+      }
+    case "tool-fs_write":
+      return {
+        key: part.toolCallId,
+        kind: "save",
+        state: toolState(part.state),
+        name: fileName(part.input?.path),
+      }
+    case "tool-fs_list":
+      return {
+        key: part.toolCallId,
+        kind: "look",
+        state: toolState(part.state),
+        name:
+          part.state === "input-streaming"
+            ? undefined
+            : fileName(part.input?.path ?? "."),
       }
     default:
       return null
