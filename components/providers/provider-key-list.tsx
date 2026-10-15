@@ -1,7 +1,7 @@
 "use client"
 
 import { PlugsConnectedIcon } from "@phosphor-icons/react/ssr"
-import { useRef, useState, useTransition } from "react"
+import { useRef, useState } from "react"
 import { removeProviderKey } from "@/app/(app)/providers/actions"
 import {
   AlertDialog,
@@ -17,19 +17,15 @@ import { Button } from "@/components/ui/button"
 import { FieldError } from "@/components/ui/field"
 import { List, ListRow, ListRowText } from "@/components/ui/list"
 import { Spinner } from "@/components/ui/spinner"
-import { Tile } from "@/components/ui/tile"
+import { Tile, type TileColor } from "@/components/ui/tile"
+import { useAction } from "@/lib/action-client"
 import { teammateCount } from "@/lib/format"
 import type { Provider } from "@/lib/models"
+import type { ProviderKeyOption } from "@/lib/provider-display"
 
-export type ProviderKeyRow = {
-  id: string
-  provider: Provider
-  label: string
-  detail: string
-  usedBy: string[]
-}
+type ProviderKeyRow = ProviderKeyOption & { usedBy: string[] }
 
-const tileColors: Record<Provider, "peach" | "mint" | "sky" | "grape"> = {
+const tileColors: Record<Provider, TileColor> = {
   anthropic: "peach",
   openai: "mint",
   google: "sky",
@@ -44,16 +40,13 @@ function joinNames(names: string[]) {
 function RemoveKey({ row }: { row: ProviderKeyRow }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
+  const { pending, error, run } = useAction()
 
   function confirm() {
-    setError(null)
-    startTransition(async () => {
-      const result = await removeProviderKey(row.id)
-      if (result.ok) setOpen(false)
-      else setError(result.message)
-    })
+    run(
+      () => removeProviderKey(row.id),
+      () => setOpen(false)
+    )
   }
 
   const used = row.usedBy.length > 0

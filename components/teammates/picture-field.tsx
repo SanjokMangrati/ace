@@ -4,15 +4,18 @@ import { CameraIcon } from "@phosphor-icons/react/ssr"
 import { useId, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldTitle } from "@/components/ui/field"
-import { PICTURE_MAX_BYTES, PICTURE_TYPES } from "@/lib/bot-schemas"
+import {
+  PICTURE_MAX_BYTES,
+  PICTURE_SIZE_MESSAGE,
+  PICTURE_TYPE_MESSAGE,
+  PICTURE_TYPES,
+} from "@/lib/bot-schemas"
 
 export function checkPicture(file: File) {
   if (!(PICTURE_TYPES as readonly string[]).includes(file.type)) {
-    return "Use a PNG, JPEG, WebP or GIF picture."
+    return PICTURE_TYPE_MESSAGE
   }
-  if (file.size > PICTURE_MAX_BYTES) {
-    return "That picture is too big. Pick one under 256 KB."
-  }
+  if (file.size > PICTURE_MAX_BYTES) return PICTURE_SIZE_MESSAGE
   return null
 }
 

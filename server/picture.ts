@@ -1,6 +1,15 @@
-import { PICTURE_MAX_BYTES } from "@/lib/bot-schemas"
+import { type Failure, fail } from "@/lib/action-result"
+import {
+  PICTURE_MAX_BYTES,
+  PICTURE_SIZE_MESSAGE,
+  PICTURE_TYPE_MESSAGE,
+  type PictureType,
+} from "@/lib/bot-schemas"
 
-const signatures: { type: string; matches: (bytes: Buffer) => boolean }[] = [
+const signatures: {
+  type: PictureType
+  matches: (bytes: Buffer) => boolean
+}[] = [
   {
     type: "image/png",
     matches: (bytes) =>
@@ -25,26 +34,13 @@ const signatures: { type: string; matches: (bytes: Buffer) => boolean }[] = [
   },
 ]
 
-export type PictureResult =
-  | { ok: true; data: Buffer; type: string }
-  | { ok: false; message: string }
-
-export function readPicture(bytes: Buffer): PictureResult {
-  if (bytes.length === 0) {
-    return { ok: false, message: "That picture is empty. Pick another one." }
-  }
-  if (bytes.length > PICTURE_MAX_BYTES) {
-    return {
-      ok: false,
-      message: "That picture is too big. Pick one under 256 KB.",
-    }
-  }
+export function readPicture(
+  bytes: Buffer
+): { ok: true; data: Buffer; type: PictureType } | Failure {
+  if (bytes.length === 0)
+    return fail("That picture is empty. Pick another one.")
+  if (bytes.length > PICTURE_MAX_BYTES) return fail(PICTURE_SIZE_MESSAGE)
   const match = signatures.find((signature) => signature.matches(bytes))
-  if (!match) {
-    return {
-      ok: false,
-      message: "Use a PNG, JPEG, WebP or GIF picture.",
-    }
-  }
+  if (!match) return fail(PICTURE_TYPE_MESSAGE)
   return { ok: true, data: bytes, type: match.type }
 }

@@ -6,11 +6,11 @@ import {
 } from "@/lib/provider-key-schemas"
 import { bot, toolGroup } from "@/server/db/schema/bots"
 
-export const BOT_NAME_MAX_LENGTH = 40
-export const BOT_JOB_MAX_LENGTH = 120
-export const BOT_INSTRUCTIONS_MAX_LENGTH = 4000
+const BOT_NAME_MAX_LENGTH = 40
+const BOT_JOB_MAX_LENGTH = 120
+const BOT_INSTRUCTIONS_MAX_LENGTH = 4000
 export const MAX_STEPS_LIMIT = 500
-export const BUDGET_MAX_USD = 1000
+const BUDGET_MAX_USD = 1000
 export const PICTURE_MAX_BYTES = 256 * 1024
 export const PICTURE_TYPES = [
   "image/png",
@@ -18,6 +18,13 @@ export const PICTURE_TYPES = [
   "image/webp",
   "image/gif",
 ] as const
+
+export type PictureType = (typeof PICTURE_TYPES)[number]
+
+export const PICTURE_TYPE_MESSAGE = "Use a PNG, JPEG, WebP or GIF picture."
+export const PICTURE_SIZE_MESSAGE = `That picture is too big. Pick one under ${PICTURE_MAX_BYTES / 1024} KB.`
+
+const PICK_PROVIDER_MESSAGE = "Pick an AI provider."
 
 export const TOOL_GROUPS = toolGroup.enumValues
 
@@ -90,7 +97,7 @@ export const botFormSchema = createInsertSchema(bot, {
   })
   .required()
   .extend({
-    providerKeyId: z.uuid({ error: "Pick an AI provider." }),
+    providerKeyId: z.uuid({ error: PICK_PROVIDER_MESSAGE }),
     askBefore: z.object(
       Object.fromEntries(TOOL_GROUPS.map((tool) => [tool, z.boolean()])) as {
         [K in ToolGroup]: z.ZodBoolean
@@ -106,10 +113,10 @@ export const teammateFormSchema = botFormSchema
   .extend({
     providerKeyId: z.union(
       [
-        z.uuid({ error: "Pick an AI provider." }),
-        z.literal(NEW_KEY, { error: "Pick an AI provider." }),
+        z.uuid({ error: PICK_PROVIDER_MESSAGE }),
+        z.literal(NEW_KEY, { error: PICK_PROVIDER_MESSAGE }),
       ],
-      { error: "Pick an AI provider." }
+      { error: PICK_PROVIDER_MESSAGE }
     ),
     newKey: providerKeyFieldsSchema,
   })

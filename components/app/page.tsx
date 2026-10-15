@@ -38,39 +38,24 @@ export function PageHeader({
 export function Section({
   id,
   title,
-  description,
   hideTitle,
   heading: Heading = "h2",
-  className,
   children,
 }: {
   id: string
   title: React.ReactNode
-  description?: React.ReactNode
   hideTitle?: boolean
   heading?: "h2" | "h3"
-  className?: string
   children: React.ReactNode
 }) {
   return (
-    <section
-      aria-labelledby={id}
-      className={cn("flex flex-col gap-3.5", className)}
-    >
-      {hideTitle ? (
-        <Heading id={id} className="sr-only">
-          {title}
-        </Heading>
-      ) : (
-        <div>
-          <Heading id={id} className="font-display text-title">
-            {title}
-          </Heading>
-          {description && (
-            <p className="mt-1 text-small text-ink-3">{description}</p>
-          )}
-        </div>
-      )}
+    <section aria-labelledby={id} className="flex flex-col gap-3.5">
+      <Heading
+        id={id}
+        className={hideTitle ? "sr-only" : "font-display text-title"}
+      >
+        {title}
+      </Heading>
       {children}
     </section>
   )

@@ -4,7 +4,7 @@ const maxSeedLength = 128
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ seed: string }> }
+  { params }: RouteContext<"/api/avatars/[seed]">
 ) {
   const { seed } = await params
   if (seed.length > maxSeedLength) {

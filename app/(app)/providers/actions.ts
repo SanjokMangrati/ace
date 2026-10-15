@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { type ActionResult, fail, zodFailure } from "@/lib/action-result"
 import {
   type ProviderKeyFormInput,
   providerKeyFormSchema,
@@ -13,31 +14,14 @@ import {
 import { sealProviderKey } from "@/server/seal-provider-key"
 import { requireUser } from "@/server/session"
 
-export type ProviderActionResult =
-  | { ok: true }
-  | { ok: false; field?: keyof ProviderKeyFormInput; message: string }
-
 export async function addProviderKey(
   values: ProviderKeyFormInput
-): Promise<ProviderActionResult> {
+): Promise<ActionResult<keyof ProviderKeyFormInput>> {
   const user = await requireUser()
   const parsed = providerKeyFormSchema.safeParse(values)
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0]
-    const field = issue?.path[0]
-    return {
-      ok: false,
-      field:
-        typeof field === "string" && field in values
-          ? (field as keyof ProviderKeyFormInput)
-          : undefined,
-      message: issue?.message ?? "Check the form and try again.",
-    }
-  }
+  if (!parsed.success) return zodFailure(parsed.error)
   const sealed = sealProviderKey(parsed.data)
-  if (!sealed.ok) {
-    return { ok: false, field: "provider", message: sealed.message }
-  }
+  if (!sealed.ok) return fail(sealed.message, "provider")
 
   await insertProviderKey({ ...sealed.key, userId: user.id })
 
@@ -45,16 +29,11 @@ export async function addProviderKey(
   return { ok: true }
 }
 
-export async function removeProviderKey(
-  keyId: string
-): Promise<ProviderActionResult> {
+export async function removeProviderKey(keyId: string): Promise<ActionResult> {
   const user = await requireUser()
   const id = z.uuid().safeParse(keyId)
   if (!id.success || !(await deleteProviderKey(user.id, id.data))) {
-    return {
-      ok: false,
-      message: "We couldn't find this key. It may already be removed.",
-    }
+    return fail("We couldn't find this key. It may already be removed.")
   }
 
   revalidatePath("/", "layout")

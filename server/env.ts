@@ -23,6 +23,7 @@ const schema = z
           "ENCRYPTION_KEY must be 32 random bytes, base64 encoded. Generate one with: openssl rand -base64 32",
       }),
     ALLOW_CUSTOM_BASE_URL: z.stringbool().default(true),
+    TRIGGER_SECRET_KEY: z.string().min(1),
   })
   .refine((env) => !env.GITHUB_CLIENT_ID === !env.GITHUB_CLIENT_SECRET, {
     message: "Set both GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or neither.",

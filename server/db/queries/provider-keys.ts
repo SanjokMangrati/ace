@@ -4,17 +4,7 @@ import type { Provider } from "@/lib/models"
 import { type Db, db } from "@/server/db/client"
 import { bot, providerKey } from "@/server/db/schema"
 
-export type ProviderKeySummary = {
-  id: string
-  provider: Provider
-  baseUrl: string | null
-  keyHint: string | null
-  usedBy: string[]
-}
-
-export async function listProviderKeys(
-  userId: string
-): Promise<ProviderKeySummary[]> {
+export async function listProviderKeys(userId: string) {
   const rows = await db.query.providerKey.findMany({
     where: eq(providerKey.userId, userId),
     columns: { id: true, provider: true, baseUrl: true, keyHint: true },

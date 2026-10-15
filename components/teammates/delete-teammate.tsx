@@ -1,7 +1,7 @@
 "use client"
 
 import { TrashIcon } from "@phosphor-icons/react/ssr"
-import { useRef, useState, useTransition } from "react"
+import { useRef } from "react"
 import { deleteTeammate } from "@/app/(app)/teammates/actions"
 import {
   AlertDialog,
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { FieldError } from "@/components/ui/field"
 import { List, ListRow, ListRowText } from "@/components/ui/list"
 import { Spinner } from "@/components/ui/spinner"
+import { useAction } from "@/lib/action-client"
 
 export function DeleteTeammate({
   botId,
@@ -29,15 +30,10 @@ export function DeleteTeammate({
   picture: string | null
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
+  const { pending, error, run } = useAction()
 
   function confirm() {
-    setError(null)
-    startTransition(async () => {
-      const result = await deleteTeammate(botId)
-      if (result && !result.ok) setError(result.message)
-    })
+    run(() => deleteTeammate(botId))
   }
 
   return (

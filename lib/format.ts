@@ -18,6 +18,34 @@ export function friendlyDate(date: Date, now = new Date()) {
   })
 }
 
+export function clockTime(date: Date) {
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+export function chatTime(date: Date, now = new Date()) {
+  const day = friendlyDate(date, now)
+  if (day === "Today") return clockTime(date)
+  if (day === "Yesterday") return day
+  return day.includes(" ") ? day : day.slice(0, 3)
+}
+
+export function workedFor(ms: number) {
+  const minutes = Math.round(ms / 60_000)
+  if (minutes < 1) return "Worked for under a minute"
+  if (minutes < 60) {
+    return `Worked for ${minutes} ${minutes === 1 ? "minute" : "minutes"}`
+  }
+  const hours = Math.round(minutes / 60)
+  return `Worked for ${hours} ${hours === 1 ? "hour" : "hours"}`
+}
+
+export function usd(amount: number) {
+  return amount.toLocaleString("en-US", { style: "currency", currency: "USD" })
+}
+
 export function teammateCount(count: number) {
   return `${count} ${count === 1 ? "teammate" : "teammates"}`
 }

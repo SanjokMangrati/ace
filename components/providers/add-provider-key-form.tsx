@@ -2,13 +2,14 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react/ssr"
-import { useId, useState } from "react"
+import { useEffect, useId, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { addProviderKey } from "@/app/(app)/providers/actions"
 import { FormError } from "@/components/form/form-error"
 import { SubmitButton } from "@/components/form/submit-button"
 import { TextField } from "@/components/form/text-field"
 import { Card } from "@/components/ui/card"
+import { callAction, setActionError } from "@/lib/action-client"
 import {
   emptyProviderKey,
   type ProviderKeyFormInput,
@@ -30,15 +31,17 @@ export function AddProviderKeyForm({
     defaultValues: emptyProviderKey(),
   })
   const provider = useWatch({ control: form.control, name: "provider" })
+  const { isSubmitSuccessful } = form.formState
+
+  useEffect(() => {
+    if (isSubmitSuccessful)
+      form.reset(emptyProviderKey(form.getValues("provider")))
+  }, [isSubmitSuccessful, form])
 
   async function onSubmit(values: ProviderKeyFormInput) {
-    const result = await addProviderKey(values)
-    if (result.ok) {
-      form.reset(emptyProviderKey(values.provider))
-      setMoreOpen(false)
-      return
-    }
-    form.setError(result.field ?? "root", { message: result.message })
+    const result = await callAction(() => addProviderKey(values))
+    if (!result.ok) return setActionError(form, result)
+    setMoreOpen(false)
   }
 
   return (

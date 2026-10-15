@@ -9,6 +9,7 @@ import { TextField } from "@/components/form/text-field"
 import { FieldSeparator } from "@/components/ui/field"
 import { TextLink } from "@/components/ui/text-link"
 import { type SignInInput, signInSchema } from "@/lib/auth-schemas"
+import { withNext } from "@/lib/safe-redirect"
 import type { SocialProvider } from "@/server/ports/auth"
 import { authClient, authErrorMessage } from "./auth-client"
 import { AUTH_TITLE_ID, AuthHeader } from "./auth-header"
@@ -39,9 +40,6 @@ export function SignInForm({
     }
     window.location.replace(next)
   }
-
-  const signUpHref =
-    next === "/" ? "/sign-up" : `/sign-up?next=${encodeURIComponent(next)}`
 
   return (
     <form
@@ -80,7 +78,10 @@ export function SignInForm({
       )}
       {signUpEnabled && (
         <p className="mt-1 text-center text-ink-2">
-          New to Ace? <TextLink href={signUpHref}>Create an account</TextLink>
+          New to Ace?{" "}
+          <TextLink href={withNext("/sign-up", next)}>
+            Create an account
+          </TextLink>
         </p>
       )}
     </form>

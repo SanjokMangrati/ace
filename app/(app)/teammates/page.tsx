@@ -43,6 +43,7 @@ export default async function TeammatesPage() {
               name={bot.name}
               job={bot.job}
               picture={teammatePictureUrl(bot)}
+              working={bot.working}
             />
           ))}
         </div>
