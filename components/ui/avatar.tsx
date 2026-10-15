@@ -92,6 +92,7 @@ function AvatarFallback({
 function TeammateAvatar({
   botId,
   name,
+  picture,
   ...props
 }: Omit<
   React.ComponentProps<typeof Avatar>,
@@ -99,6 +100,7 @@ function TeammateAvatar({
 > & {
   botId: string
   name: string
+  picture?: string | null
 }) {
   return (
     <Avatar
@@ -108,7 +110,11 @@ function TeammateAvatar({
       aria-label={name}
       {...props}
     >
-      <AvatarImage src={`/api/avatars/${encodeURIComponent(botId)}`} alt="" />
+      <AvatarImage
+        key={picture ?? botId}
+        src={picture ?? `/api/avatars/${encodeURIComponent(botId)}`}
+        alt=""
+      />
       <AvatarFallback aria-hidden className={candyBackgrounds[candyFor(name)]}>
         {name.charAt(0).toUpperCase()}
       </AvatarFallback>
