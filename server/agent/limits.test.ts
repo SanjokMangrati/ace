@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { costUsd, endReason, totalUsage, turnNotice } from "./limits"
+import {
+  costUsd,
+  endReason,
+  sandboxCostUsd,
+  totalUsage,
+  turnNotice,
+} from "./limits"
 
 const price = { inputUsdPerMTok: 2, outputUsdPerMTok: 10 }
 
@@ -24,6 +30,18 @@ describe("costUsd", () => {
 
   it("is free when the model has no price", () => {
     expect(costUsd(undefined, { inputTokens: 1000 })).toBe(0)
+  })
+})
+
+describe("sandboxCostUsd", () => {
+  it("bills the hourly rate for the time since the sandbox opened", () => {
+    expect(
+      sandboxCostUsd({ since: 0, usdPerHour: 0.2 }, 30 * 60 * 1000)
+    ).toBeCloseTo(0.1)
+  })
+
+  it("is free when the turn never opened the sandbox", () => {
+    expect(sandboxCostUsd(undefined, Date.now())).toBe(0)
   })
 })
 

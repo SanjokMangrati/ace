@@ -7,14 +7,39 @@ import {
   CheckCircleIcon,
   CircleNotchIcon,
   EraserIcon,
+  FileTextIcon,
+  FloppyDiskIcon,
+  FolderOpenIcon,
   LightbulbIcon,
   PauseCircleIcon,
+  TerminalWindowIcon,
 } from "@phosphor-icons/react/ssr"
 import { useId, useState } from "react"
 import { Tile } from "@/components/ui/tile"
 import { workedFor } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Step } from "./message-parts"
+
+const fileWords = {
+  read: {
+    running: "Reading",
+    done: "Read",
+    failed: "Couldn't read",
+    fallback: "a file",
+  },
+  save: {
+    running: "Saving",
+    done: "Saved",
+    failed: "Couldn't save",
+    fallback: "a file",
+  },
+  look: {
+    running: "Looking in",
+    done: "Looked in",
+    failed: "Couldn't look in",
+    fallback: "a folder",
+  },
+}
 
 function sentence(step: Step) {
   switch (step.kind) {
@@ -38,8 +63,34 @@ function sentence(step: Step) {
           Forgot: <b>{step.content}</b>
         </>
       )
+    case "command": {
+      const purpose = step.purpose ? ` to ${step.purpose}` : ""
+      if (step.state === "running") return `Running a command${purpose}…`
+      if (step.state === "failed") return `Couldn't run the command${purpose}`
+      return `Ran a command${purpose}`
+    }
+    case "read":
+    case "save":
+    case "look": {
+      const words = fileWords[step.kind]
+      return (
+        <>
+          {words[step.state]} {step.name ? <b>{step.name}</b> : words.fallback}
+          {step.state === "running" && "…"}
+        </>
+      )
+    }
   }
 }
+
+const stepTiles = {
+  remember: { color: "sun", Icon: LightbulbIcon },
+  forget: { color: "sun", Icon: EraserIcon },
+  command: { color: "lime", Icon: TerminalWindowIcon },
+  read: { color: "sky", Icon: FileTextIcon },
+  save: { color: "sky", Icon: FloppyDiskIcon },
+  look: { color: "sky", Icon: FolderOpenIcon },
+} as const
 
 function StepIcon({ step }: { step: Step }) {
   if (step.state === "failed") {
@@ -52,14 +103,44 @@ function StepIcon({ step }: { step: Step }) {
       </Tile>
     )
   }
+  const { color, Icon } = stepTiles[step.kind]
   return (
-    <Tile size="xs" color="sun" className="-mt-0.5">
-      {step.kind === "remember" ? (
-        <LightbulbIcon weight="duotone" />
-      ) : (
-        <EraserIcon weight="duotone" />
-      )}
+    <Tile size="xs" color={color} className="-mt-0.5">
+      <Icon weight="duotone" />
     </Tile>
+  )
+}
+
+function CommandDetails({
+  command,
+  output,
+}: {
+  command: string
+  output: string | undefined
+}) {
+  const detailsId = useId()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={detailsId}
+        onClick={() => setOpen((value) => !value)}
+        className="ml-9 cursor-pointer self-start text-caption text-ink-3 underline decoration-line-strong underline-offset-3 hover:decoration-current"
+      >
+        {open ? "Hide details" : "Show details"}
+      </button>
+      {open && (
+        <div
+          id={detailsId}
+          className="mt-1.5 ml-9 max-h-45 overflow-auto rounded-sm bg-fill px-3 py-2.5 font-mono text-code whitespace-pre text-ink-2"
+        >
+          {[`$ ${command}`, output].filter(Boolean).join("\n")}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -124,16 +205,22 @@ export function Activity({
           className="ml-2.5 flex flex-col gap-0.5 border-l-2 border-dotted border-line-strong pl-4.5"
         >
           {steps.map((step) => (
-            <li
-              key={step.key}
-              className={cn(
-                "flex items-start gap-2.5 py-1.25 text-body text-ink-2 [&_b]:font-medium [&_b]:text-ink",
-                step.state === "failed" &&
-                  "[&_b]:text-needs-you [&_svg]:text-needs-you"
-              )}
-            >
-              <StepIcon step={step} />
-              <span className="min-w-0 flex-1">{sentence(step)}</span>
+            <li key={step.key} className="flex flex-col gap-1.5 py-1.25">
+              <div
+                className={cn(
+                  "flex items-start gap-2.5 text-body text-ink-2 [&_b]:font-medium [&_b]:text-ink",
+                  step.state === "failed" &&
+                    "[&_b]:text-needs-you [&_svg]:text-needs-you"
+                )}
+              >
+                <StepIcon step={step} />
+                <span className="min-w-0 flex-1">{sentence(step)}</span>
+              </div>
+              {step.kind === "command" &&
+                step.command &&
+                step.state !== "running" && (
+                  <CommandDetails command={step.command} output={step.output} />
+                )}
             </li>
           ))}
         </ol>

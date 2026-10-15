@@ -12,4 +12,5 @@ export interface ModelRegistry {
     credentials: ProviderCredentials,
     modelId: string
   ): LanguageModel
+  rejectsKey(credentials: ProviderCredentials): Promise<boolean>
 }

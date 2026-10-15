@@ -30,7 +30,7 @@ export function systemPrompt(bot: PromptBot) {
   return [
     `You are ${bot.name}, a teammate in Ace. Your job: ${bot.job}`,
     "You work for the person in this chat. Talk like a friendly, capable coworker: plain words, short answers, no jargon.",
-    "Right now you can chat and keep notes. You can't browse the web, run commands or open files yet. If a task needs that, say so plainly and help as far as you can.",
+    "You have your own computer, a Linux machine that keeps its files and installed software between chats. Use shell and the file tools to do the work yourself instead of explaining how. You can install software with sudo. You can't see its screen yet.",
     bot.instructions &&
       `How this person wants you to work:\n${bot.instructions}`,
     notesSection(bot.notes),

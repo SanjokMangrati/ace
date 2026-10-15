@@ -6,7 +6,10 @@ type Usage = { inputTokens?: number; outputTokens?: number }
 
 export type Price = Pick<CatalogModel, "inputUsdPerMTok" | "outputUsdPerMTok">
 
+export type SandboxUse = { since: number; usdPerHour: number }
+
 export const DAY_MS = 24 * 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
 
 export function totalUsage(steps: readonly { usage: Usage }[]) {
   return steps.reduce(
@@ -25,6 +28,11 @@ export function costUsd(price: Price | undefined, usage: Usage) {
       (usage.outputTokens ?? 0) * price.outputUsdPerMTok) /
     1_000_000
   )
+}
+
+export function sandboxCostUsd(use: SandboxUse | undefined, until: number) {
+  if (!use) return 0
+  return ((until - use.since) / HOUR_MS) * use.usdPerHour
 }
 
 export function endReason(turn: {

@@ -1,5 +1,6 @@
 import type { InferUITools, UIMessage } from "ai"
 import type { NoteTools } from "@/server/agent/notes"
+import type { SandboxTools } from "@/server/agent/sandbox-tools"
 
 export const TEAMMATE_CHAT_TASK = "teammate-chat"
 
@@ -15,7 +16,7 @@ export type TurnNotice =
 export type TeammateMessage = UIMessage<
   MessageMetadata,
   { notice: TurnNotice },
-  InferUITools<NoteTools>
+  InferUITools<NoteTools & SandboxTools>
 >
 
 export function chatTitle(text: string) {
