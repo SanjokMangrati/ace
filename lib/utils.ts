@@ -28,7 +28,7 @@ export const cn = createCn({
       radius: ["mark", "xs", "check", "tile-xs", "tile", "avatar"],
       shadow: ["card", "pop", "overlay"],
       spacing: ["sidebar", "screen-panel", "control", "control-sm"],
-      container: ["thread", "tagline"],
+      container: ["thread", "tagline", "intro", "empty"],
       font: ["display"],
       animate: ["breathe"],
       ease: ["spring"],

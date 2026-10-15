@@ -1,0 +1,51 @@
+import Link from "next/link"
+import { TeammateAvatar } from "@/components/ui/avatar"
+import { buttonVariants } from "@/components/ui/button"
+
+export function TeammateCard({
+  id,
+  name,
+  job,
+  picture,
+}: {
+  id: string
+  name: string
+  job: string
+  picture: string | null
+}) {
+  const href = `/teammates/${id}`
+
+  return (
+    <article className="relative flex min-w-0 flex-col gap-4 rounded-md bg-surface p-5 shadow-card">
+      <div className="flex min-w-0 items-center gap-3.5">
+        <TeammateAvatar botId={id} name={name} picture={picture} size="lg" />
+        <div className="min-w-0">
+          <h2 className="font-display text-name-lg">
+            <Link
+              href={href}
+              className="after:absolute after:inset-0 after:rounded-md focus-visible:outline-hidden focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ring"
+            >
+              {name}
+            </Link>
+          </h2>
+          <p className="text-small text-ink-2">{job}</p>
+        </div>
+      </div>
+      <div className="flex min-h-control-sm items-center justify-between gap-2">
+        <span />
+        <Link
+          href={href}
+          tabIndex={-1}
+          aria-hidden
+          className={buttonVariants({
+            variant: "ghost",
+            size: "sm",
+            className: "relative",
+          })}
+        >
+          Settings
+        </Link>
+      </div>
+    </article>
+  )
+}
