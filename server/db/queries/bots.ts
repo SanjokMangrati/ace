@@ -1,5 +1,5 @@
 import "server-only"
-import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm"
+import { and, asc, desc, eq, exists, isNotNull, isNull, sql } from "drizzle-orm"
 import {
   type BotFormInput,
   DEFAULT_ASK_BEFORE,
@@ -11,7 +11,7 @@ import {
   insertProviderKey,
   type NewProviderKey,
 } from "@/server/db/queries/provider-keys"
-import { bot, botToolPolicy, note } from "@/server/db/schema"
+import { bot, botToolPolicy, note, turn } from "@/server/db/schema"
 
 export type BotPicture = { data: Buffer; type: string }
 
@@ -26,7 +26,6 @@ async function resolveKeyId(
 ) {
   if ("id" in key) return key.id
   const row = await insertProviderKey({ ...key.create, userId }, executor)
-  if (!row) throw new Error("Provider key was not saved")
   return row.id
 }
 
@@ -40,18 +39,20 @@ export async function listBots(userId: string) {
       job: bot.job,
       hasPicture: sql<boolean>`${hasPicture}`,
       updatedAt: bot.updatedAt,
+      working: sql<boolean>`${exists(
+        db
+          .select({ id: turn.id })
+          .from(turn)
+          .where(and(eq(turn.botId, bot.id), isNull(turn.endedAt)))
+      )}`,
     })
     .from(bot)
     .where(eq(bot.userId, userId))
     .orderBy(asc(bot.createdAt))
 }
 
-export async function countBots(userId: string) {
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(bot)
-    .where(eq(bot.userId, userId))
-  return row?.count ?? 0
+export function countBots(userId: string) {
+  return db.$count(bot, eq(bot.userId, userId))
 }
 
 export async function findBot(userId: string, id: string) {
@@ -142,7 +143,7 @@ export async function updateBot(
       .from(bot)
       .where(and(eq(bot.id, id), eq(bot.userId, userId)))
     if (exists.length === 0) return false
-    const updated = await tx
+    await tx
       .update(bot)
       .set({
         ...columnsFrom(input),
@@ -153,8 +154,6 @@ export async function updateBot(
         }),
       })
       .where(and(eq(bot.id, id), eq(bot.userId, userId)))
-      .returning({ id: bot.id })
-    if (updated.length === 0) return false
     await tx
       .insert(botToolPolicy)
       .values(policyRows(id, input.askBefore))

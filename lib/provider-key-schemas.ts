@@ -3,8 +3,10 @@ import { z } from "zod"
 import { PROVIDER_INFO, type Provider } from "@/lib/models"
 import { providerKey } from "@/server/db/schema/bots"
 
-export const API_KEY_MIN_LENGTH = 20
-export const API_KEY_MAX_LENGTH = 500
+const API_KEY_MIN_LENGTH = 20
+const API_KEY_MAX_LENGTH = 500
+
+const httpUrlSchema = z.url({ protocol: /^https?$/ })
 
 export const providerKeyFieldsSchema = createInsertSchema(providerKey, {
   baseUrl: (schema) => schema.trim().max(500, "That address is too long."),
@@ -27,7 +29,7 @@ export function checkProviderKey(
   path: string[] = []
 ) {
   if (value.provider === "openai_compatible") {
-    if (!isHttpUrl(value.baseUrl)) {
+    if (!httpUrlSchema.safeParse(value.baseUrl).success) {
       ctx.addIssue({
         code: "custom",
         path: [...path, "baseUrl"],
@@ -73,14 +75,4 @@ export function emptyProviderKey(
   provider: Provider = "anthropic"
 ): ProviderKeyFormInput {
   return { provider, baseUrl: "", judgeModelId: "", apiKey: "" }
-}
-
-function isHttpUrl(value: string | null | undefined) {
-  if (!value) return false
-  try {
-    const url = new URL(value)
-    return url.protocol === "https:" || url.protocol === "http:"
-  } catch {
-    return false
-  }
 }

@@ -11,7 +11,7 @@ export default async function HomePage() {
     listProviderKeys(user.id),
     countBots(user.id),
   ])
-  if (keys.length > 0 && botCount > 0) redirect("/teammates")
+  if (keys.length > 0 && botCount > 0) redirect("/chats/new")
 
   return (
     <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">

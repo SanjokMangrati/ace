@@ -13,6 +13,7 @@ import {
   type SignUpInput,
   signUpSchema,
 } from "@/lib/auth-schemas"
+import { withNext } from "@/lib/safe-redirect"
 import type { SocialProvider } from "@/server/ports/auth"
 import { authClient, authErrorMessage } from "./auth-client"
 import { AUTH_TITLE_ID, AuthHeader } from "./auth-header"
@@ -38,9 +39,6 @@ export function SignUpForm({
     }
     window.location.replace(next)
   }
-
-  const signInHref =
-    next === "/" ? "/sign-in" : `/sign-in?next=${encodeURIComponent(next)}`
 
   return (
     <form
@@ -86,7 +84,8 @@ export function SignUpForm({
         </>
       )}
       <p className="mt-1 text-center text-ink-2">
-        Already have an account? <TextLink href={signInHref}>Sign in</TextLink>
+        Already have an account?{" "}
+        <TextLink href={withNext("/sign-in", next)}>Sign in</TextLink>
       </p>
     </form>
   )

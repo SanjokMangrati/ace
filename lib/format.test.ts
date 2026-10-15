@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { friendlyDate, teammateCount } from "./format"
+import { chatTime, friendlyDate, teammateCount, usd, workedFor } from "./format"
 
 const now = new Date(2026, 9, 14, 15, 30)
 
@@ -26,5 +26,29 @@ describe("teammateCount", () => {
   it("pluralizes", () => {
     expect(teammateCount(1)).toBe("1 teammate")
     expect(teammateCount(4)).toBe("4 teammates")
+  })
+})
+
+describe("chatTime", () => {
+  it("shows the time today and a short day before that", () => {
+    expect(chatTime(new Date(2026, 9, 14, 14, 4), now)).toBe("2:04 PM")
+    expect(chatTime(new Date(2026, 9, 13, 9, 0), now)).toBe("Yesterday")
+    expect(chatTime(new Date(2026, 9, 9), now)).toBe("Fri")
+    expect(chatTime(new Date(2026, 8, 30), now)).toBe("Sep 30")
+  })
+})
+
+describe("workedFor", () => {
+  it("rounds to friendly units", () => {
+    expect(workedFor(20_000)).toBe("Worked for under a minute")
+    expect(workedFor(60_000)).toBe("Worked for 1 minute")
+    expect(workedFor(12 * 60_000)).toBe("Worked for 12 minutes")
+    expect(workedFor(2 * 60 * 60_000)).toBe("Worked for 2 hours")
+  })
+})
+
+describe("usd", () => {
+  it("shows dollars and cents", () => {
+    expect(usd(2)).toBe("$2.00")
   })
 })

@@ -5,12 +5,12 @@ import {
   ReceiptIcon,
 } from "@phosphor-icons/react/ssr"
 import { PickCard } from "@/components/ui/pick-card"
-import { Tile } from "@/components/ui/tile"
+import { Tile, type TileColor } from "@/components/ui/tile"
 import { TEAMMATE_PRESETS, type TeammatePreset } from "@/lib/teammate-presets"
 
 const looks: Record<
   TeammatePreset["id"],
-  { color: "grape" | "sky" | "mint" | "peach"; Icon: typeof PenNibIcon }
+  { color: TileColor; Icon: typeof PenNibIcon }
 > = {
   researcher: { color: "grape", Icon: MagnifyingGlassIcon },
   writer: { color: "sky", Icon: PenNibIcon },

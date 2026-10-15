@@ -28,6 +28,8 @@ const tileVariants = cva(
   }
 )
 
+type TileColor = NonNullable<VariantProps<typeof tileVariants>["color"]>
+
 function Tile({
   className,
   color,
@@ -45,4 +47,4 @@ function Tile({
   )
 }
 
-export { Tile }
+export { Tile, type TileColor }

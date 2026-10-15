@@ -1,5 +1,9 @@
 import type { NextConfig } from "next"
 
-const nextConfig: NextConfig = {}
+const nextConfig: NextConfig = {
+  logging: {
+    serverFunctions: false,
+  },
+}
 
 export default nextConfig

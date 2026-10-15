@@ -40,12 +40,21 @@
           "level": "error",
           "options": {
             "paths": {
-              "better-auth": "Import Better Auth only from server/adapters/better-auth. Use the AuthPort from @/server/container."
+              "better-auth": "Import Better Auth only from server/adapters/better-auth. Use the AuthPort from @/server/container.",
+              "@trigger.dev/sdk": "Import Trigger.dev only from server/adapters/trigger, trigger/, or components/chat/use-chat-transport.ts. Use the ChatRuntime port from @/server/container.",
+              "@ai-sdk/anthropic": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port.",
+              "@ai-sdk/openai": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port.",
+              "@ai-sdk/google": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port.",
+              "@ai-sdk/openai-compatible": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port."
             },
             "patterns": [
               {
                 "group": ["better-auth/**", "@better-auth/**"],
                 "message": "Import Better Auth only from server/adapters/better-auth. Use the AuthPort from @/server/container."
+              },
+              {
+                "group": ["@trigger.dev/**"],
+                "message": "Import Trigger.dev only from server/adapters/trigger, trigger/, or components/chat/use-chat-transport.ts. Use the ChatRuntime port from @/server/container."
               }
             ]
           }
@@ -80,6 +89,31 @@
         "server/adapters/better-auth/**",
         "components/auth/auth-client.ts"
       ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "server/adapters/trigger/**",
+        "trigger/**",
+        "trigger.config.ts",
+        "components/chat/use-chat-transport.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["server/adapters/ai-sdk/**"],
       "linter": {
         "rules": {
           "style": {

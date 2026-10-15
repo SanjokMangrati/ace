@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CaretLeftIcon } from "@phosphor-icons/react/ssr"
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { flushSync } from "react-dom"
 import { type FieldErrors, useForm, useWatch } from "react-hook-form"
 import { createTeammate, updateTeammate } from "@/app/(app)/teammates/actions"
@@ -27,6 +27,7 @@ import {
 import { TeammateAvatar } from "@/components/ui/avatar"
 import { buttonVariants } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { callAction, setActionError } from "@/lib/action-client"
 import {
   ADVANCED_FIELDS,
   NEW_KEY,
@@ -34,32 +35,30 @@ import {
   teammateFormSchema,
 } from "@/lib/bot-schemas"
 import {
-  catalogModel,
   defaultModelId,
-  PROVIDER_INFO,
   type Provider,
+  type ProviderModels,
 } from "@/lib/models"
+import type { ProviderKeyOption } from "@/lib/provider-display"
 import { findPreset, type TeammatePreset } from "@/lib/teammate-presets"
 import { AskBefore } from "./ask-before"
 import { checkPicture, PictureField } from "./picture-field"
 import { PresetPicker } from "./preset-picker"
 
-export type ProviderKeyOption = {
-  id: string
-  provider: Provider
-  label: string
-  detail: string
-}
-
 const FORM_ID = "teammate-form"
 const ADVANCED = "advanced"
 
 function usePicturePreview(file: File | null) {
-  const url = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
+  const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
-    if (!url) return
-    return () => URL.revokeObjectURL(url)
-  }, [url])
+    if (!file) {
+      setUrl(null)
+      return
+    }
+    const objectUrl = URL.createObjectURL(file)
+    setUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [file])
   return url
 }
 
@@ -70,6 +69,7 @@ export function TeammateForm({
   savedPicture,
   defaultValues,
   providerKeys,
+  models,
   allowCustom,
   children,
 }: {
@@ -79,6 +79,7 @@ export function TeammateForm({
   savedPicture: string | null
   defaultValues: TeammateFormInput
   providerKeys: ProviderKeyOption[]
+  models: ProviderModels
   allowCustom: boolean
   children?: React.ReactNode
 }) {
@@ -115,7 +116,7 @@ export function TeammateForm({
   const provider: Provider | undefined = addingKey
     ? newKeyProvider
     : providerKeys.find((key) => key.id === providerKeyId)?.provider
-  const catalog = provider ? PROVIDER_INFO[provider].models : []
+  const catalog = provider ? models[provider] : []
 
   const keyOptions: SelectFieldOption[] = [
     ...providerKeys.map((key) => ({
@@ -131,14 +132,18 @@ export function TeammateForm({
     detail: model.vision ? "Can see and use its screen" : "Can't see screens",
   }))
 
+  function inCatalog(of: Provider, modelId: string) {
+    return models[of].some((model) => model.id === modelId)
+  }
+
   function syncModel(next: Provider | undefined) {
     if (!next) return
     const current = form.getValues("modelId")
-    if (PROVIDER_INFO[next].models.length > 0) {
-      if (!catalogModel(next, current)) {
-        form.setValue("modelId", defaultModelId(next))
+    if (models[next].length > 0) {
+      if (!inCatalog(next, current)) {
+        form.setValue("modelId", defaultModelId(models[next]))
       }
-    } else if (provider && catalogModel(provider, current)) {
+    } else if (provider && inCatalog(provider, current)) {
       form.setValue("modelId", "")
     }
   }
@@ -197,22 +202,20 @@ export function TeammateForm({
     else if (pictureRemoved) formData.set("removePicture", "true")
 
     const save = mode === "create" ? createTeammate : updateTeammate
-    const result = await save(formData)
-    if (!result || result.ok) return
-    const field = result.field
+    const failure = await callAction(() => save(formData))
+    const { field, message } = failure
     if (field === "picture") {
-      setPictureError(result.message)
-      form.setError("root.picture", { message: result.message })
-    } else if (field) {
-      if (
-        ADVANCED_FIELDS.some((advancedField) => field.startsWith(advancedField))
-      ) {
-        openAdvanced()
-      }
-      form.setError(field, { message: result.message }, { shouldFocus: true })
-    } else {
-      form.setError("root", { message: result.message })
+      setPictureError(message)
+      form.setError("root.picture", { message })
+      return
     }
+    if (
+      field &&
+      ADVANCED_FIELDS.some((advancedField) => field.startsWith(advancedField))
+    ) {
+      openAdvanced()
+    }
+    setActionError(form, { ...failure, field })
   }
 
   return (

@@ -1,11 +1,7 @@
 import { TeammateFaces } from "@/components/brand/teammate-faces"
 import { Wordmark } from "@/components/brand/wordmark"
 
-export default function AuthLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-svh flex-wrap bg-bg text-ink">
       <section

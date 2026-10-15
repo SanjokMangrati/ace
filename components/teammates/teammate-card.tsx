@@ -1,17 +1,20 @@
 import Link from "next/link"
 import { TeammateAvatar } from "@/components/ui/avatar"
 import { buttonVariants } from "@/components/ui/button"
+import { Status } from "@/components/ui/status"
 
 export function TeammateCard({
   id,
   name,
   job,
   picture,
+  working,
 }: {
   id: string
   name: string
   job: string
   picture: string | null
+  working: boolean
 }) {
   const href = `/teammates/${id}`
 
@@ -32,18 +35,17 @@ export function TeammateCard({
         </div>
       </div>
       <div className="flex min-h-control-sm items-center justify-between gap-2">
-        <span />
+        {working ? <Status tone="working">Working</Status> : <span />}
         <Link
-          href={href}
-          tabIndex={-1}
-          aria-hidden
+          href={`/chats/new?teammate=${id}`}
+          aria-label={`Chat with ${name}`}
           className={buttonVariants({
-            variant: "ghost",
+            variant: "secondary",
             size: "sm",
             className: "relative",
           })}
         >
-          Settings
+          Chat
         </Link>
       </div>
     </article>

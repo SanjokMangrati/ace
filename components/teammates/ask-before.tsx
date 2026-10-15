@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { List, ListRowText } from "@/components/ui/list"
 import { Switch } from "@/components/ui/switch"
-import { Tile } from "@/components/ui/tile"
+import { Tile, type TileColor } from "@/components/ui/tile"
 import type { TeammateFormInput, ToolGroup } from "@/lib/bot-schemas"
 import { cn } from "@/lib/utils"
 
@@ -22,7 +22,7 @@ const tools: {
   tool: ToolGroup
   title: string
   example: string
-  color: "lime" | "sky" | "peach" | "grape" | "sun" | "bubblegum"
+  color: TileColor
   Icon: typeof TerminalWindowIcon
 }[] = [
   {

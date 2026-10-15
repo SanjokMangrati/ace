@@ -1,7 +1,7 @@
 "use client"
 
 import { type Control, type FieldValues, useFormState } from "react-hook-form"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ErrorNotice } from "@/components/app/error-notice"
 
 export function FormError<TValues extends FieldValues>({
   control,
@@ -15,9 +15,5 @@ export function FormError<TValues extends FieldValues>({
     errors.root?.message ?? (isSubmitted ? undefined : initialMessage)
   if (!message) return null
 
-  return (
-    <Alert variant="danger">
-      <AlertDescription>{message}</AlertDescription>
-    </Alert>
-  )
+  return <ErrorNotice message={message} />
 }

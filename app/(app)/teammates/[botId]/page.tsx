@@ -6,8 +6,9 @@ import { TeammateForm } from "@/components/teammates/teammate-form"
 import { TeammateMemory } from "@/components/teammates/teammate-memory"
 import { botIdSchema, NEW_KEY } from "@/lib/bot-schemas"
 import { teammatePictureUrl } from "@/lib/format"
-import { providerKeyOptions } from "@/lib/provider-display"
+import { providerKeyOption } from "@/lib/provider-display"
 import { emptyProviderKey } from "@/lib/provider-key-schemas"
+import { modelCatalog } from "@/server/container"
 import { findBot } from "@/server/db/queries/bots"
 import { listProviderKeys } from "@/server/db/queries/provider-keys"
 import { env } from "@/server/env"
@@ -34,7 +35,10 @@ export default async function TeammatePage({
   params,
 }: PageProps<"/teammates/[botId]">) {
   const { user, bot } = await loadBot(params)
-  const keys = providerKeyOptions(await listProviderKeys(user.id))
+  const [keys, models] = await Promise.all([
+    listProviderKeys(user.id).then((rows) => rows.map(providerKeyOption)),
+    modelCatalog.listAll(),
+  ])
   const picture = teammatePictureUrl(bot)
 
   return (
@@ -45,6 +49,7 @@ export default async function TeammatePage({
       savedName={bot.name}
       savedPicture={picture}
       providerKeys={keys}
+      models={models}
       allowCustom={env.ALLOW_CUSTOM_BASE_URL}
       defaultValues={{
         name: bot.name,

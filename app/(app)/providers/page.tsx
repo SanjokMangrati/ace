@@ -4,7 +4,7 @@ import { Page, PageHeader, Section } from "@/components/app/page"
 import { AddProviderKeyForm } from "@/components/providers/add-provider-key-form"
 import { ProviderKeyList } from "@/components/providers/provider-key-list"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { providerKeyOptions } from "@/lib/provider-display"
+import { providerKeyOption } from "@/lib/provider-display"
 import { listProviderKeys } from "@/server/db/queries/provider-keys"
 import { env } from "@/server/env"
 import { requireUser } from "@/server/session"
@@ -16,9 +16,8 @@ export const metadata: Metadata = {
 export default async function ProvidersPage() {
   const user = await requireUser()
   const keys = await listProviderKeys(user.id)
-  const options = providerKeyOptions(keys)
-  const rows = keys.map((key, index) => ({
-    ...options[index],
+  const rows = keys.map((key) => ({
+    ...providerKeyOption(key),
     usedBy: key.usedBy,
   }))
 
