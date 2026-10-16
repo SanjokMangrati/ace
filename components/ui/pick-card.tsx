@@ -40,7 +40,7 @@ function PickCard({
         className="grid size-6 shrink-0 place-items-center rounded-full border-1.5 border-input text-on-sun group-aria-pressed/pick:border-on-sun group-aria-pressed/pick:bg-sun"
       >
         <CheckIcon
-          weight="duotone"
+          weight="regular"
           className="size-3.5 opacity-0 group-aria-pressed/pick:opacity-100"
         />
       </span>

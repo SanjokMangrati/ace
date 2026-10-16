@@ -1,5 +1,6 @@
-import type { LanguageModel } from "ai"
+import type { LanguageModel, Tool } from "ai"
 import type { Provider } from "@/lib/models"
+import type { ComputerHandlers } from "./computer"
 
 type ProviderCredentials = {
   provider: Provider
@@ -13,4 +14,9 @@ export interface ModelRegistry {
     modelId: string
   ): LanguageModel
   rejectsKey(credentials: ProviderCredentials): Promise<boolean>
+  nativeComputerTool(
+    provider: Provider,
+    modelId: string,
+    handlers: ComputerHandlers
+  ): Tool | undefined
 }

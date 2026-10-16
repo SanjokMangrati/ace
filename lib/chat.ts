@@ -1,22 +1,39 @@
 import type { InferUITools, UIMessage } from "ai"
+import type { z } from "zod"
+import type { computerInputSchema } from "@/server/agent/computer"
 import type { NoteTools } from "@/server/agent/notes"
 import type { SandboxTools } from "@/server/agent/sandbox-tools"
+import type {
+  ComputerOutput,
+  NativeComputerInput,
+} from "@/server/ports/computer"
 
 export const TEAMMATE_CHAT_TASK = "teammate-chat"
 
 const TITLE_MAX_LENGTH = 80
 
-type MessageMetadata = { createdAt?: number; finishedAt?: number }
+export type ControlEvent = { tookAt: number; gaveAt?: number }
+
+type MessageMetadata = {
+  createdAt?: number
+  finishedAt?: number
+  control?: ControlEvent
+}
 
 export type TurnNotice =
   | { reason: "step_limit"; steps: number }
   | { reason: "task_budget" | "daily_budget"; limitUsd: number }
   | { reason: "error"; message: string }
 
+type ComputerUITool = {
+  input: z.input<typeof computerInputSchema> | NativeComputerInput
+  output: ComputerOutput
+}
+
 export type TeammateMessage = UIMessage<
   MessageMetadata,
-  { notice: TurnNotice },
-  InferUITools<NoteTools & SandboxTools>
+  { notice: TurnNotice; control: ControlEvent },
+  InferUITools<NoteTools & SandboxTools> & { computer: ComputerUITool }
 >
 
 export function chatTitle(text: string) {

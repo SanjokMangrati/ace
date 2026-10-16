@@ -69,7 +69,7 @@ const tools: {
   },
 ]
 
-const rowClassName = "flex cursor-pointer items-center gap-3.5 px-4.5 py-3.5"
+const rowClassName = "flex cursor-pointer items-center gap-3.5 px-4.5 py-2.5"
 
 export function AskBefore({
   control,

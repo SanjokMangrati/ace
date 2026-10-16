@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import type { FieldPath } from "react-hook-form"
 import {
+  type ActionResult,
   type Failure,
   fail,
   RELOAD_AND_TRY_AGAIN,
@@ -12,6 +13,7 @@ import {
 import {
   botIdSchema,
   NEW_KEY,
+  TEAMMATE_NOT_FOUND,
   type TeammateFormInput,
   teammateFormSchema,
 } from "@/lib/bot-schemas"
@@ -32,10 +34,8 @@ import { readPicture } from "@/server/picture"
 import { sealProviderKey } from "@/server/seal-provider-key"
 import { requireUser } from "@/server/session"
 
-type TeammateFailure = Failure<FieldPath<TeammateFormInput> | "picture">
-
-const TEAMMATE_NOT_FOUND =
-  "We couldn't find this teammate. It may have been deleted."
+type TeammateField = FieldPath<TeammateFormInput> | "picture"
+type TeammateFailure = Failure<TeammateField>
 
 async function resolveKey(
   userId: string,
@@ -106,7 +106,7 @@ async function parseForm(
 
 export async function createTeammate(
   formData: FormData
-): Promise<TeammateFailure> {
+): Promise<ActionResult<TeammateField>> {
   const user = await requireUser()
   const id = botIdSchema.safeParse(formData.get("id"))
   if (!id.success) return fail(RELOAD_AND_TRY_AGAIN)
@@ -116,12 +116,12 @@ export async function createTeammate(
   await insertBot(user.id, id.data, form.input, form.key, form.picture ?? null)
 
   revalidatePath("/", "layout")
-  redirect("/teammates")
+  return { ok: true }
 }
 
 export async function updateTeammate(
   formData: FormData
-): Promise<TeammateFailure> {
+): Promise<ActionResult<TeammateField>> {
   const user = await requireUser()
   const id = botIdSchema.safeParse(formData.get("id"))
   if (!id.success) return fail(TEAMMATE_NOT_FOUND)
@@ -138,7 +138,7 @@ export async function updateTeammate(
   if (!updated) return fail(TEAMMATE_NOT_FOUND)
 
   revalidatePath("/", "layout")
-  redirect("/teammates")
+  return { ok: true }
 }
 
 export async function deleteTeammate(botId: string): Promise<Failure> {
@@ -146,7 +146,11 @@ export async function deleteTeammate(botId: string): Promise<Failure> {
   const id = botIdSchema.safeParse(botId)
   if (!id.success) return fail(TEAMMATE_NOT_FOUND)
   const chatIds = await listBotChatIds(user.id, id.data)
-  await Promise.all(chatIds.map((chatId) => chatRuntime.closeSession(chatId)))
+  await Promise.all(
+    chatIds.map((chatId) =>
+      chatRuntime.closeSession(chatId, "teammate deleted")
+    )
+  )
   const sandbox = await findBotSandbox(user.id, id.data)
   if (sandbox) await sandboxes.destroy(sandbox.providerRef)
   if (!(await deleteBot(user.id, id.data))) return fail(TEAMMATE_NOT_FOUND)

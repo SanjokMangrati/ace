@@ -54,9 +54,13 @@ export function SocialSignIn({
             onClick={() => signIn(provider)}
           >
             {pending === provider ? (
-              <Spinner className="size-4.5" />
+              <Spinner data-icon="inline-start" className="size-4.5" />
             ) : (
-              <ProviderIcon weight="duotone" className="size-4.5" />
+              <ProviderIcon
+                weight="duotone"
+                data-icon="inline-start"
+                className="size-4.5"
+              />
             )}
             {labels[provider]}
           </Button>

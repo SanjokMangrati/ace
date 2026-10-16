@@ -1,9 +1,6 @@
-export const PROVIDERS = [
-  "anthropic",
-  "openai",
-  "google",
-  "openai_compatible",
-] as const
+import { providerKind } from "@/server/db/schema/bots"
+
+export const PROVIDERS = providerKind.enumValues
 
 export type Provider = (typeof PROVIDERS)[number]
 

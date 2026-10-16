@@ -7,7 +7,7 @@ export type AuthUser = {
   image: string | null
 }
 
-export type AuthSession = {
+type AuthSession = {
   id: string
   expiresAt: Date
   user: AuthUser

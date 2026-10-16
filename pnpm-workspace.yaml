@@ -6,6 +6,7 @@ allowBuilds:
   msw: false
   esbuild: true
   protobufjs: false
+  '@depot/cli': false
 
 minimumReleaseAgeExclude:
   - '@trigger.dev/core@4.7.4'
@@ -15,3 +16,5 @@ minimumReleaseAgeExclude:
   - '@daytona/api-client@0.224.1'
   - '@daytona/sdk@0.224.1'
   - '@daytona/toolbox-api-client@0.224.1'
+  - '@trigger.dev/schema-to-json@4.7.4'
+  - trigger.dev@4.7.4

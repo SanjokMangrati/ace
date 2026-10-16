@@ -49,6 +49,7 @@ export default async function ChatPage({
       }}
       initialMessages={chat.messages}
       session={session}
+      inControl={chat.control === "user"}
     />
   )
 }

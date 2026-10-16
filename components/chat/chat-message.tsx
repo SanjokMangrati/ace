@@ -1,6 +1,10 @@
 "use client"
 
 import {
+  ArrowCounterClockwiseIcon,
+  HandPalmIcon,
+} from "@phosphor-icons/react/ssr"
+import {
   Message,
   MessageContent,
   MessageResponse,
@@ -33,7 +37,55 @@ function Time({ at, className }: { at?: number; className?: string }) {
   )
 }
 
-export function YourMessage({ message }: { message: TeammateMessage }) {
+function ControlEvents({
+  teammateName,
+  tookAt,
+  gaveAt,
+}: {
+  teammateName: string
+  tookAt: number
+  gaveAt?: number
+}) {
+  const events = [
+    {
+      Icon: HandPalmIcon,
+      text: `You took control of ${teammateName}'s screen`,
+      at: tookAt,
+    },
+    ...(gaveAt === undefined
+      ? []
+      : [
+          {
+            Icon: ArrowCounterClockwiseIcon,
+            text: "You gave back control",
+            at: gaveAt,
+          },
+        ]),
+  ]
+  return (
+    <div className="flex flex-col gap-3">
+      {events.map(({ Icon, text, at }) => (
+        <p
+          key={text}
+          className="flex items-center justify-center gap-2 text-caption text-ink-3"
+        >
+          <Icon weight="duotone" className="size-4.5 shrink-0" />
+          {text} · <Time at={at} />
+        </p>
+      ))}
+    </div>
+  )
+}
+
+export function YourMessage({
+  message,
+  teammateName,
+}: {
+  message: TeammateMessage
+  teammateName: string
+}) {
+  const control = message.metadata?.control
+  if (control) return <ControlEvents teammateName={teammateName} {...control} />
   const text = message.parts
     .map((part) => (part.type === "text" ? part.text : ""))
     .join("")

@@ -1,13 +1,13 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { CaretLeftIcon } from "@phosphor-icons/react/ssr"
-import Link from "next/link"
+import { InfoIcon } from "@phosphor-icons/react/ssr"
 import { useEffect, useState } from "react"
 import { flushSync } from "react-dom"
 import { type FieldErrors, useForm, useWatch } from "react-hook-form"
 import { createTeammate, updateTeammate } from "@/app/(app)/teammates/actions"
-import { Page, Section } from "@/components/app/page"
+import { Section } from "@/components/app/page"
+import { useCloseModal } from "@/components/app/route-modal"
 import { FormError } from "@/components/form/form-error"
 import { NumberSentenceField } from "@/components/form/number-sentence-field"
 import {
@@ -24,9 +24,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { TeammateAvatar } from "@/components/ui/avatar"
-import { buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  DialogBody,
+  DialogClose,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { callAction, setActionError } from "@/lib/action-client"
 import {
   ADVANCED_FIELDS,
@@ -41,6 +49,7 @@ import {
 } from "@/lib/models"
 import type { ProviderKeyOption } from "@/lib/provider-display"
 import { findPreset, type TeammatePreset } from "@/lib/teammate-presets"
+import { cn } from "@/lib/utils"
 import { AskBefore } from "./ask-before"
 import { checkPicture, PictureField } from "./picture-field"
 import { PresetPicker } from "./preset-picker"
@@ -83,6 +92,7 @@ export function TeammateForm({
   allowCustom: boolean
   children?: React.ReactNode
 }) {
+  const closeModal = useCloseModal()
   const form = useForm<TeammateFormInput>({
     resolver: zodResolver(teammateFormSchema),
     defaultValues,
@@ -108,6 +118,7 @@ export function TeammateForm({
     control: form.control,
     name: "newKey.provider",
   })
+  const modelId = useWatch({ control: form.control, name: "modelId" })
 
   const displayName = watchedName.trim() || savedName
   const name = displayName || "Your teammate"
@@ -117,6 +128,9 @@ export function TeammateForm({
     ? newKeyProvider
     : providerKeys.find((key) => key.id === providerKeyId)?.provider
   const catalog = provider ? models[provider] : []
+  const blindModel =
+    Boolean(provider && modelId) &&
+    !catalog.some((model) => model.id === modelId && model.vision)
 
   const keyOptions: SelectFieldOption[] = [
     ...providerKeys.map((key) => ({
@@ -202,8 +216,9 @@ export function TeammateForm({
     else if (pictureRemoved) formData.set("removePicture", "true")
 
     const save = mode === "create" ? createTeammate : updateTeammate
-    const failure = await callAction(() => save(formData))
-    const { field, message } = failure
+    const result = await callAction(() => save(formData))
+    if (result.ok) return closeModal()
+    const { field, message } = result
     if (field === "picture") {
       setPictureError(message)
       form.setError("root.picture", { message })
@@ -215,54 +230,32 @@ export function TeammateForm({
     ) {
       openAdvanced()
     }
-    setActionError(form, { ...failure, field })
+    setActionError(form, { ...result, field })
   }
 
   return (
     <>
-      <Page className="max-w-180 gap-12 pb-12">
+      <DialogHeader className="flex-row items-center gap-4">
+        <TeammateAvatar botId={botId} name={name} picture={picture} size="lg" />
+        <div className="min-w-0">
+          <DialogTitle id="teammate-title" className="truncate">
+            {displayName || "New teammate"}
+          </DialogTitle>
+          {watchedJob.trim() && (
+            <p className="truncate text-small text-ink-2">
+              {watchedJob.trim()}
+            </p>
+          )}
+        </div>
+      </DialogHeader>
+      <DialogBody className="flex flex-col gap-6">
         <form
           id={FORM_ID}
           onSubmit={form.handleSubmit(onSubmit, onInvalid)}
           noValidate
           aria-labelledby="teammate-title"
-          className="flex flex-col gap-12"
+          className="flex flex-col gap-6"
         >
-          <div className="flex flex-col gap-4">
-            <Link
-              href="/teammates"
-              className={buttonVariants({
-                variant: "ghost",
-                size: "sm",
-                className: "-ml-3 self-start",
-              })}
-            >
-              <CaretLeftIcon weight="duotone" data-icon="inline-start" />
-              Teammates
-            </Link>
-            <div className="flex items-center gap-4.5">
-              <TeammateAvatar
-                botId={botId}
-                name={name}
-                picture={picture}
-                size="xl"
-              />
-              <div className="min-w-0">
-                <h1
-                  id="teammate-title"
-                  className="font-display text-title-lg wrap-break-word"
-                >
-                  {displayName || "New teammate"}
-                </h1>
-                {watchedJob.trim() && (
-                  <p className="mt-1 text-ink-2 wrap-break-word">
-                    {watchedJob.trim()}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
           <FormError control={form.control} />
 
           {mode === "create" && (
@@ -272,36 +265,40 @@ export function TeammateForm({
           )}
 
           <Section id="s-profile" title="Profile">
-            <Card className="gap-6 p-6">
+            <Card className="gap-4 px-4">
               <PictureField
                 hasPicture={picture !== null}
                 error={pictureError}
                 onPick={pickPicture}
                 onRemove={removePicture}
               />
-              <TextField
-                control={form.control}
-                name="name"
-                label="Name"
-                autoComplete="off"
-              />
-              <TextField
-                control={form.control}
-                name="job"
-                label="Job"
-                autoComplete="off"
-              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField
+                  control={form.control}
+                  name="name"
+                  label="Name"
+                  autoComplete="off"
+                />
+                <TextField
+                  control={form.control}
+                  name="job"
+                  label="Job"
+                  autoComplete="off"
+                />
+              </div>
               <TextareaField
                 control={form.control}
                 name="instructions"
                 label="Instructions"
-                rows={5}
+                rows={4}
               />
             </Card>
           </Section>
 
           <Section id="s-model" title="AI model">
-            <Card className="gap-6 p-6">
+            <Card
+              className={cn("grid gap-4 px-4", !addingKey && "sm:grid-cols-2")}
+            >
               {providerKeys.length > 0 && (
                 <SelectField
                   control={form.control}
@@ -343,6 +340,16 @@ export function TeammateForm({
                   disabled={!provider}
                 />
               )}
+              {blindModel && (
+                <Alert className="sm:col-span-2">
+                  <InfoIcon weight="duotone" />
+                  <AlertDescription>
+                    With this model, {nameInSentence} can't see or use its
+                    screen, so it works only through commands and files. Pick a
+                    model that can see screens to let it use apps and websites.
+                  </AlertDescription>
+                </Alert>
+              )}
             </Card>
           </Section>
 
@@ -356,7 +363,7 @@ export function TeammateForm({
               </AccordionTrigger>
               <AccordionContent
                 keepMounted
-                className="flex flex-col gap-12 pt-8"
+                className="flex flex-col gap-6 pt-4"
               >
                 <Section
                   id="s-ask"
@@ -371,7 +378,7 @@ export function TeammateForm({
                 </Section>
 
                 <Section id="s-limits" heading="h3" title="Limits">
-                  <Card className="gap-4 p-6">
+                  <Card className="gap-3 px-4">
                     <NumberSentenceField
                       control={form.control}
                       name="maxSteps"
@@ -399,23 +406,18 @@ export function TeammateForm({
           </Accordion>
         </form>
         {children}
-      </Page>
-      <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-bg px-4 py-3.5 sm:px-6">
+      </DialogBody>
+      <DialogFooter>
         {mode === "edit" && (
           <span className="mr-auto text-small text-ink-3">
             Changes apply from {savedName}'s next task.
           </span>
         )}
-        <Link
-          href="/teammates"
-          className={buttonVariants({ variant: "ghost" })}
-        >
-          Cancel
-        </Link>
+        <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
         <SubmitButton control={form.control} form={FORM_ID}>
           {mode === "create" ? "Create teammate" : "Save changes"}
         </SubmitButton>
-      </div>
+      </DialogFooter>
     </>
   )
 }

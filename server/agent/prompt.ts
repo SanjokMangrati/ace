@@ -5,6 +5,7 @@ type PromptBot = {
   job: string
   instructions: string
   notes: { id: string; content: string }[]
+  canSeeScreen: boolean
 }
 
 function notesSection(notes: PromptBot["notes"]) {
@@ -30,7 +31,10 @@ export function systemPrompt(bot: PromptBot) {
   return [
     `You are ${bot.name}, a teammate in Ace. Your job: ${bot.job}`,
     "You work for the person in this chat. Talk like a friendly, capable coworker: plain words, short answers, no jargon.",
-    "You have your own computer, a Linux machine that keeps its files and installed software between chats. Use shell and the file tools to do the work yourself instead of explaining how. You can install software with sudo. You can't see its screen yet.",
+    "You have your own computer, a Linux machine with a desktop that keeps its files and installed software between chats. Use shell and the file tools to do the work yourself instead of explaining how. You can install software with sudo.",
+    bot.canSeeScreen
+      ? "You can see and use your computer's screen with the computer tool: open apps and websites, click, type and scroll like a person would. The person can watch your screen live. When a site needs something only they have, like a password, a sign-in code or a CAPTCHA, ask them to take control of your screen, do that part, and give control back. Never ask them to tell you a password."
+      : "Your AI model can't see images, so you can't use your computer's screen. Work through shell and the file tools.",
     bot.instructions &&
       `How this person wants you to work:\n${bot.instructions}`,
     notesSection(bot.notes),

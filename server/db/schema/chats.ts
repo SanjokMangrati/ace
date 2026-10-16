@@ -14,7 +14,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core"
 import { user } from "./auth"
-import { bot } from "./bots"
+import { bot, bytea } from "./bots"
 
 export const turnEndReason = pgEnum("turn_end_reason", [
   "done",
@@ -98,6 +98,21 @@ export const turn = pgTable(
   (table) => [
     index("turn_chatId_idx").on(table.chatId),
     index("turn_botId_startedAt_idx").on(table.botId, table.startedAt),
+  ]
+)
+
+export const screenshot = pgTable(
+  "screenshot",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    data: bytea("data").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("screenshot_chatId_createdAt_idx").on(table.chatId, table.createdAt),
   ]
 )
 

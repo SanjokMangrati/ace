@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { Section } from "@/components/app/page"
+import { RouteModal } from "@/components/app/route-modal"
 import { DeleteTeammate } from "@/components/teammates/delete-teammate"
 import { TeammateForm } from "@/components/teammates/teammate-form"
 import { TeammateMemory } from "@/components/teammates/teammate-memory"
@@ -42,35 +43,37 @@ export default async function TeammatePage({
   const picture = teammatePictureUrl(bot)
 
   return (
-    <TeammateForm
-      key={bot.updatedAt.getTime()}
-      mode="edit"
-      botId={bot.id}
-      savedName={bot.name}
-      savedPicture={picture}
-      providerKeys={keys}
-      models={models}
-      allowCustom={env.ALLOW_CUSTOM_BASE_URL}
-      defaultValues={{
-        name: bot.name,
-        job: bot.job,
-        instructions: bot.instructions,
-        providerKeyId: bot.providerKeyId ?? (keys.length > 0 ? "" : NEW_KEY),
-        newKey: emptyProviderKey(),
-        modelId: bot.modelId,
-        fullAuto: bot.fullAuto,
-        maxSteps: bot.maxSteps,
-        taskBudgetUsd: bot.taskBudgetUsd,
-        dailyBudgetUsd: bot.dailyBudgetUsd,
-        askBefore: bot.askBefore,
-      }}
-    >
-      <Section id="s-memory" title={`What ${bot.name} remembers`}>
-        <TeammateMemory name={bot.name} notes={bot.notes} />
-      </Section>
-      <Section id="s-delete" title="Delete" hideTitle>
-        <DeleteTeammate botId={bot.id} name={bot.name} picture={picture} />
-      </Section>
-    </TeammateForm>
+    <RouteModal fallback="/teammates" className="sm:max-w-180">
+      <TeammateForm
+        key={bot.updatedAt.getTime()}
+        mode="edit"
+        botId={bot.id}
+        savedName={bot.name}
+        savedPicture={picture}
+        providerKeys={keys}
+        models={models}
+        allowCustom={env.ALLOW_CUSTOM_BASE_URL}
+        defaultValues={{
+          name: bot.name,
+          job: bot.job,
+          instructions: bot.instructions,
+          providerKeyId: bot.providerKeyId ?? (keys.length > 0 ? "" : NEW_KEY),
+          newKey: emptyProviderKey(),
+          modelId: bot.modelId,
+          fullAuto: bot.fullAuto,
+          maxSteps: bot.maxSteps,
+          taskBudgetUsd: bot.taskBudgetUsd,
+          dailyBudgetUsd: bot.dailyBudgetUsd,
+          askBefore: bot.askBefore,
+        }}
+      >
+        <Section id="s-memory" title={`What ${bot.name} remembers`}>
+          <TeammateMemory name={bot.name} notes={bot.notes} />
+        </Section>
+        <Section id="s-delete" title="Delete" hideTitle>
+          <DeleteTeammate botId={bot.id} name={bot.name} picture={picture} />
+        </Section>
+      </TeammateForm>
+    </RouteModal>
   )
 }

@@ -26,10 +26,14 @@ export const ConversationContent = ({
   children,
   ...props
 }: ConversationContentProps) => (
-  <StickToBottom.Content className="px-4 py-8 sm:px-6" {...props}>
+  <StickToBottom.Content
+    className="px-4 py-8 sm:px-6"
+    scrollClassName="scrollbar-main"
+    {...props}
+  >
     <div
       className={cn(
-        "mx-auto flex w-full max-w-thread flex-col gap-8",
+        "mx-auto flex w-full max-w-thread flex-col gap-6",
         className
       )}
     >

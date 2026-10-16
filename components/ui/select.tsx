@@ -105,7 +105,7 @@ function SelectItem({
         {children}
       </SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator className="pointer-events-none absolute right-2.5 flex items-center">
-        <CheckIcon weight="duotone" className="size-5" />
+        <CheckIcon weight="regular" className="size-5" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   )

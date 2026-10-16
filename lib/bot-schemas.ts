@@ -24,6 +24,9 @@ export type PictureType = (typeof PICTURE_TYPES)[number]
 export const PICTURE_TYPE_MESSAGE = "Use a PNG, JPEG, WebP or GIF picture."
 export const PICTURE_SIZE_MESSAGE = `That picture is too big. Pick one under ${PICTURE_MAX_BYTES / 1024} KB.`
 
+export const TEAMMATE_NOT_FOUND =
+  "We couldn't find this teammate. It may have been deleted."
+
 const PICK_PROVIDER_MESSAGE = "Pick an AI provider."
 
 export const TOOL_GROUPS = toolGroup.enumValues

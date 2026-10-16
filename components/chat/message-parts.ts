@@ -4,12 +4,67 @@ type Part = TeammateMessage["parts"][number]
 
 type StepState = "running" | "done" | "failed"
 
+type ScreenVerb = "look" | "click" | "type" | "scroll" | "move" | "wait"
+
+export type Shot = { id: string; width: number; height: number }
+
 export type Step = { key: string; state: StepState } & (
   | { kind: "think" }
   | { kind: "remember" | "forget"; content?: string }
   | { kind: "command"; purpose?: string; command?: string; output?: string }
   | { kind: "read" | "save" | "look"; name?: string }
+  | {
+      kind: "screen"
+      verb: ScreenVerb
+      intent?: string
+      shot?: Shot
+      at?: { x: number; y: number }
+    }
+  | { kind: "control" }
 )
+
+const screenVerbs: Record<string, ScreenVerb> = {
+  screenshot: "look",
+  cursor_position: "look",
+  click: "click",
+  left_click: "click",
+  right_click: "click",
+  middle_click: "click",
+  double_click: "click",
+  triple_click: "click",
+  type: "type",
+  key: "type",
+  scroll: "scroll",
+  move: "move",
+  mouse_move: "move",
+  drag: "move",
+  left_click_drag: "move",
+  wait: "wait",
+}
+
+type ComputerPart = Extract<Part, { type: "tool-computer" }>
+
+function screenStep(part: ComputerPart): Step {
+  const input = part.input
+  const action = input?.action
+  const generic = typeof action === "object" ? action : undefined
+  const [x, y] =
+    generic && "x" in generic
+      ? [generic.x, generic.y]
+      : input && "coordinate" in input
+        ? (input.coordinate ?? [])
+        : []
+  return {
+    key: part.toolCallId,
+    kind: "screen",
+    state: toolState(part.state),
+    verb: screenVerbs[generic?.type ?? String(action)] ?? "look",
+    intent: input && "intent" in input ? input.intent : undefined,
+    shot:
+      part.state === "output-available" ? part.output.screenshot : undefined,
+    at: typeof x === "number" && typeof y === "number" ? { x, y } : undefined,
+  }
+}
 
 const HOME = new Set(["", ".", "./", "~", "~/"])
 
@@ -82,6 +137,14 @@ function stepOf(part: Part, index: number): Step | null {
           part.state === "input-streaming"
             ? undefined
             : fileName(part.input?.path ?? "."),
+      }
+    case "tool-computer":
+      return screenStep(part)
+    case "data-control":
+      return {
+        key: part.id ?? `control-${index}`,
+        kind: "control",
+        state: part.data.gaveAt === undefined ? "running" : "done",
       }
     default:
       return null

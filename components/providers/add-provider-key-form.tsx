@@ -50,7 +50,7 @@ export function AddProviderKeyForm({
       noValidate
       aria-labelledby={labelledBy}
     >
-      <Card className="gap-6 p-6">
+      <Card className="gap-4 px-4">
         <FormError control={form.control} />
         <ProviderKeyFields
           control={form.control}

@@ -19,6 +19,7 @@ import {
   chat,
   message,
   type RuntimeCursors,
+  sandbox,
   turn,
   type turnEndReason,
 } from "@/server/db/schema"
@@ -38,6 +39,13 @@ const working = exists(
     .where(and(eq(turn.chatId, chat.id), isNull(turn.endedAt)))
 )
 
+const inControl = exists(
+  db
+    .select({ id: sandbox.id })
+    .from(sandbox)
+    .where(and(eq(sandbox.controlChatId, chat.id), eq(sandbox.control, "user")))
+)
+
 const botColumns = {
   id: bot.id,
   name: bot.name,
@@ -46,19 +54,19 @@ const botColumns = {
 }
 
 export async function listChats(userId: string) {
-  const rows = await db
+  return db
     .select({
       id: chat.id,
       title: chat.title,
       updatedAt: chat.updatedAt,
       working: sql<boolean>`${working}`,
+      inControl: sql<boolean>`${inControl}`,
       bot: botColumns,
     })
     .from(chat)
     .innerJoin(bot, eq(bot.id, chat.botId))
     .where(eq(chat.userId, userId))
     .orderBy(desc(chat.updatedAt))
-  return rows
 }
 
 export async function findChat(userId: string, id: string) {
@@ -67,14 +75,15 @@ export async function findChat(userId: string, id: string) {
       id: chat.id,
       title: chat.title,
       cursors: chat.runtimeCursors,
-      working: sql<boolean>`${working}`,
       bot: {
         ...botColumns,
         connected: sql<boolean>`${isNotNull(bot.providerKeyId)}`,
       },
+      control: sandbox.control,
     })
     .from(chat)
     .innerJoin(bot, eq(bot.id, chat.botId))
+    .leftJoin(sandbox, eq(sandbox.botId, chat.botId))
     .where(and(eq(chat.id, id), eq(chat.userId, userId)))
   if (!row) return null
   const { messages } = await loadTranscript<TeammateMessage>(id)
@@ -87,6 +96,14 @@ export async function ownsChat(userId: string, id: string) {
     .from(chat)
     .where(and(eq(chat.id, id), eq(chat.userId, userId)))
   return rows.length > 0
+}
+
+export async function findChatBotId(userId: string, id: string) {
+  const [row] = await db
+    .select({ botId: chat.botId })
+    .from(chat)
+    .where(and(eq(chat.id, id), eq(chat.userId, userId)))
+  return row?.botId ?? null
 }
 
 export async function listBotChatIds(userId: string, botId: string) {
@@ -108,6 +125,14 @@ export async function insertChat(
   if (owned === 0) return false
   await db.insert(chat).values({ ...values, userId })
   return true
+}
+
+export async function deleteChat(userId: string, id: string) {
+  const rows = await db
+    .delete(chat)
+    .where(and(eq(chat.id, id), eq(chat.userId, userId)))
+    .returning({ id: chat.id })
+  return rows.length > 0
 }
 
 export async function findChatContext(chatId: string) {

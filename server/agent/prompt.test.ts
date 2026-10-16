@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { NOTES_BUDGET_CHARS, systemPrompt } from "./prompt"
 
-const bot = { name: "Researcher", job: "Finds sources", instructions: "" }
+const bot = {
+  name: "Researcher",
+  job: "Finds sources",
+  instructions: "",
+  canSeeScreen: true,
+}
 
 describe("systemPrompt", () => {
   it("lists notes with their ids, newest first", () => {
@@ -25,6 +30,13 @@ describe("systemPrompt", () => {
     expect(prompt).toContain("[a]")
     expect(prompt).not.toContain("[b]")
     expect(prompt).toContain("Some older notes were left out")
+  })
+
+  it("mentions the screen only when the model can see it", () => {
+    expect(systemPrompt({ ...bot, notes: [] })).toContain("computer tool")
+    expect(systemPrompt({ ...bot, canSeeScreen: false, notes: [] })).toContain(
+      "can't use your computer's screen"
+    )
   })
 
   it("adds the person's instructions only when there are some", () => {

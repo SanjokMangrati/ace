@@ -26,6 +26,7 @@ function fakeSandbox(file: { data: Buffer; isDir?: boolean }) {
       write: vi.fn(async () => {}),
       list: async () => [],
     },
+    desktop: () => Promise.reject(new Error("No desktop in this test.")),
   } satisfies Sandbox
 }
 
