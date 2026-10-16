@@ -53,7 +53,7 @@ export function NewChatForm({
     <form
       onSubmit={form.handleSubmit(onSubmit)}
       noValidate
-      className="flex flex-col gap-8"
+      className="flex flex-col gap-6"
     >
       <FormError control={form.control} />
       <PickField
@@ -80,7 +80,7 @@ export function NewChatForm({
           className="flex items-center gap-3.5 rounded-md border-1.5 border-dashed border-line-strong p-4 font-display text-button text-ink-2 transition duration-150 ease-out hover:bg-fill hover:text-ink"
         >
           <Tile className="size-12 rounded-avatar">
-            <PlusIcon weight="duotone" />
+            <PlusIcon weight="regular" />
           </Tile>
           New teammate
         </Link>

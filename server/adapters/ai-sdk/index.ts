@@ -4,6 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { Provider } from "@/lib/models"
 import type { ModelRegistry } from "@/server/ports/models"
+import { anthropicComputerTool } from "./computer"
 
 const KEY_CHECK_TIMEOUT_MS = 10_000
 
@@ -62,6 +63,11 @@ export function createAiSdkModels(): ModelRegistry {
       } catch {
         return false
       }
+    },
+    nativeComputerTool(provider, modelId, handlers) {
+      return provider === "anthropic"
+        ? anthropicComputerTool(modelId, handlers)
+        : undefined
     },
   }
 }

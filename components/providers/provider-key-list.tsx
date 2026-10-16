@@ -89,7 +89,7 @@ export function ProviderKeyList({ rows }: { rows: ProviderKeyRow[] }) {
   return (
     <List>
       {rows.map((row) => (
-        <ListRow key={row.id}>
+        <ListRow key={row.id} className="py-2.5">
           <Tile color={tileColors[row.provider]}>
             <PlugsConnectedIcon weight="duotone" />
           </Tile>

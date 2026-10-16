@@ -106,6 +106,19 @@ function DropdownMenuItem({
   )
 }
 
+function DropdownMenuLinkItem({
+  className,
+  ...props
+}: MenuPrimitive.LinkItem.Props) {
+  return (
+    <MenuPrimitive.LinkItem
+      data-slot="dropdown-menu-link-item"
+      className={cn(itemClassName, className)}
+      {...props}
+    />
+  )
+}
+
 function DropdownMenuSub({ ...props }: MenuPrimitive.SubmenuRoot.Props) {
   return <MenuPrimitive.SubmenuRoot data-slot="dropdown-menu-sub" {...props} />
 }
@@ -174,7 +187,7 @@ function DropdownMenuCheckboxItem({
         data-slot="dropdown-menu-checkbox-item-indicator"
       >
         <MenuPrimitive.CheckboxItemIndicator>
-          <CheckIcon weight="duotone" />
+          <CheckIcon weight="regular" />
         </MenuPrimitive.CheckboxItemIndicator>
       </span>
       {children}
@@ -211,7 +224,7 @@ function DropdownMenuRadioItem({
         data-slot="dropdown-menu-radio-item-indicator"
       >
         <MenuPrimitive.RadioItemIndicator>
-          <CheckIcon weight="duotone" />
+          <CheckIcon weight="regular" />
         </MenuPrimitive.RadioItemIndicator>
       </span>
       {children}
@@ -240,6 +253,7 @@ export {
   DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuLinkItem,
   DropdownMenuCheckboxItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,

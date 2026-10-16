@@ -35,6 +35,8 @@ RUN apt-get update && apt-get install -y \
     libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+RUN echo 'export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --no-sandbox --test-type --disable-dev-shm-usage --no-first-run --no-default-browser-check"' > /etc/chromium.d/ace
+
 RUN useradd -m daytona && echo "daytona ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/91-daytona
 
 RUN bash -c "source /usr/local/share/nvm/nvm.sh && nvm install 24 && nvm alias default 24" \

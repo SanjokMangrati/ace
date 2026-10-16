@@ -2,6 +2,7 @@ import { CheckIcon } from "@phosphor-icons/react/ssr"
 import Link from "next/link"
 import { TeammateAvatar } from "@/components/ui/avatar"
 import { buttonVariants } from "@/components/ui/button"
+import { type Provider, providerLabel } from "@/lib/models"
 import { cn } from "@/lib/utils"
 
 function Step({
@@ -26,7 +27,7 @@ function Step({
         )}
       >
         {done ? (
-          <CheckIcon weight="duotone" className="size-4.5" aria-label="Done" />
+          <CheckIcon weight="regular" className="size-4.5" aria-label="Done" />
         ) : (
           number
         )}
@@ -40,7 +41,7 @@ function Step({
   )
 }
 
-export function EmptyStateFaces() {
+function EmptyStateFaces() {
   return (
     <div aria-hidden className="mb-1 flex items-end gap-2.5">
       <TeammateAvatar
@@ -65,14 +66,46 @@ export function EmptyStateFaces() {
   )
 }
 
-export function SetupGuide({
+export function EmptyState({
+  heading: Heading = "h2",
+  title,
+  description,
+  provider,
+  hasTeammate,
+  className,
+}: {
+  heading?: "h1" | "h2"
+  title: string
+  description: string
+  provider: Provider | undefined
+  hasTeammate: boolean
+  className?: string
+}) {
+  return (
+    <div
+      className={cn("flex flex-col items-center gap-3 text-center", className)}
+    >
+      <EmptyStateFaces />
+      <Heading className="font-display text-title-lg text-balance">
+        {title}
+      </Heading>
+      <p className="max-w-empty text-ink-2">{description}</p>
+      <SetupGuide
+        connectedProvider={provider && providerLabel(provider)}
+        hasTeammate={hasTeammate}
+      />
+    </div>
+  )
+}
+
+function SetupGuide({
   connectedProvider,
   hasTeammate,
 }: {
-  connectedProvider: string | null
+  connectedProvider: string | undefined
   hasTeammate: boolean
 }) {
-  const connected = connectedProvider !== null
+  const connected = connectedProvider !== undefined
 
   return (
     <div className="mt-2 flex w-full max-w-110 flex-col gap-2.5 text-left">

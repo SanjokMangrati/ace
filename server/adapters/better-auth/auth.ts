@@ -19,8 +19,6 @@ const github =
 
 export const auth = betterAuth({
   appName: "Ace",
-  baseURL: env.BETTER_AUTH_URL,
-  secret: env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: {
     enabled: true,

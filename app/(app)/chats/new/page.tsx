@@ -22,11 +22,16 @@ export default async function NewChatPage({
   const picked = bots.find((bot) => bot.id === teammate) ?? bots[0]
 
   return (
-    <Page className="max-w-thread pt-18">
-      <PageHeader
-        title="Who should work on this?"
-        description="Pick the teammate for this task."
-      />
+    <Page
+      width="max-w-thread"
+      title="Who should work on this?"
+      header={
+        <PageHeader
+          title="Who should work on this?"
+          description="Pick the teammate for this task."
+        />
+      }
+    >
       <NewChatForm
         chatId={crypto.randomUUID()}
         defaultBotId={picked.id}

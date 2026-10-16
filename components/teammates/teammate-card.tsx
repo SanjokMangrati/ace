@@ -36,17 +36,30 @@ export function TeammateCard({
       </div>
       <div className="flex min-h-control-sm items-center justify-between gap-2">
         {working ? <Status tone="working">Working</Status> : <span />}
-        <Link
-          href={`/chats/new?teammate=${id}`}
-          aria-label={`Chat with ${name}`}
-          className={buttonVariants({
-            variant: "secondary",
-            size: "sm",
-            className: "relative",
-          })}
-        >
-          Chat
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={href}
+            aria-label={`${name}'s settings`}
+            className={buttonVariants({
+              variant: "ghost",
+              size: "sm",
+              className: "relative",
+            })}
+          >
+            Settings
+          </Link>
+          <Link
+            href={`/chats/new?teammate=${id}`}
+            aria-label={`Chat with ${name}`}
+            className={buttonVariants({
+              variant: "secondary",
+              size: "sm",
+              className: "relative",
+            })}
+          >
+            Chat
+          </Link>
+        </div>
       </div>
     </article>
   )

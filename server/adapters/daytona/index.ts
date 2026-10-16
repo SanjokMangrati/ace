@@ -5,11 +5,64 @@ import {
   DaytonaProcessExecutionTimeoutError,
   type Sandbox as DaytonaSandbox,
 } from "@daytona/sdk"
-import type { Sandbox, SandboxProvider } from "@/server/ports/sandbox"
+import type { Desktop, Sandbox, SandboxProvider } from "@/server/ports/sandbox"
 
 const START_TIMEOUT_SEC = 300
 const USD_PER_VCPU_HOUR = 0.0504
 const USD_PER_GIB_HOUR = 0.0162
+const NOVNC_PORT = 6080
+
+async function startDesktop(sandbox: DaytonaSandbox): Promise<Desktop> {
+  const { computerUse } = sandbox
+  if ((await computerUse.getStatus()).status !== "active") {
+    await computerUse.start()
+  }
+  return {
+    size: async () => {
+      const { displays = [] } = await computerUse.display.getInfo()
+      const display = displays.find((item) => item.isActive) ?? displays[0]
+      return { width: display?.width ?? 0, height: display?.height ?? 0 }
+    },
+    screenshot: async ({ scale, quality }) => {
+      const shot = await computerUse.screenshot.takeCompressed({
+        format: "jpeg",
+        quality,
+        scale,
+        showCursor: true,
+      })
+      return Buffer.from(shot.screenshot ?? "", "base64")
+    },
+    click: async ({ x, y }, { button, clicks, modifiers }) => {
+      await computerUse.mouse.click(x, y, button, undefined, clicks, modifiers)
+    },
+    move: async ({ x, y }) => {
+      await computerUse.mouse.move(x, y)
+    },
+    drag: async (from, to) => {
+      await computerUse.mouse.drag(from.x, from.y, to.x, to.y)
+    },
+    scroll: async ({ x, y }, direction, amount) => {
+      await computerUse.mouse.scroll(x, y, direction, amount)
+    },
+    type: (text) => computerUse.keyboard.type(text),
+    key: (combo) => computerUse.keyboard.hotkey(combo),
+    cursor: async () => {
+      const { x = 0, y = 0 } = await computerUse.mouse.getPosition()
+      return { x, y }
+    },
+    liveView: async (mode, ttlSec) => {
+      const { url } = await sandbox.getSignedPreviewUrl(NOVNC_PORT, ttlSec)
+      const params = new URLSearchParams({
+        autoconnect: "true",
+        reconnect: "true",
+        resize: "scale",
+        quality: "9",
+        view_only: String(mode === "view"),
+      })
+      return `${url}/vnc.html?${params}`
+    },
+  }
+}
 
 function wrap(sandbox: DaytonaSandbox): Sandbox {
   return {
@@ -50,6 +103,7 @@ function wrap(sandbox: DaytonaSandbox): Sandbox {
         }))
       },
     },
+    desktop: () => startDesktop(sandbox),
   }
 }
 

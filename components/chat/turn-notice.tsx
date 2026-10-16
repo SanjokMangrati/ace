@@ -1,9 +1,6 @@
-import {
-  HourglassIcon,
-  InfoIcon,
-  WarningCircleIcon,
-} from "@phosphor-icons/react/ssr"
+import { HourglassIcon, InfoIcon } from "@phosphor-icons/react/ssr"
 import Link from "next/link"
+import { ErrorNotice } from "@/components/app/error-notice"
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
 import type { TurnNotice as Notice } from "@/lib/chat"
@@ -20,14 +17,7 @@ export function TurnNotice({
   settingsHref: string
   onKeepGoing?: () => void
 }) {
-  if (notice.reason === "error") {
-    return (
-      <Alert variant="danger">
-        <WarningCircleIcon weight="duotone" />
-        <AlertDescription>{notice.message}</AlertDescription>
-      </Alert>
-    )
-  }
+  if (notice.reason === "error") return <ErrorNotice message={notice.message} />
 
   const changeLimit = (label: string) => (
     <Link
