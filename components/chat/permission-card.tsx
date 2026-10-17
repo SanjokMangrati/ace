@@ -7,6 +7,7 @@ import {
   FileTextIcon,
   FloppyDiskIcon,
   FolderOpenIcon,
+  GlobeSimpleIcon,
   HandPalmIcon,
   InfoIcon,
   KeyboardIcon,
@@ -63,6 +64,13 @@ function askWords(step: Step, name: string): Words {
     case "forget":
       return { title: `${name} wants to forget a note`, Icon: EraserIcon }
     case "screen":
+      if (step.verb === "open") {
+        return {
+          title: `${name} wants to open a page on its screen`,
+          line: step.text,
+          Icon: GlobeSimpleIcon,
+        }
+      }
       if (step.verb === "type") {
         return {
           title: `${name} wants to type on its screen`,

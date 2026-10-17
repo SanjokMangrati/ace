@@ -21,11 +21,11 @@ export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
         queued: chat.queued,
         needsYou: chat.needsYou,
         inControl: chat.inControl,
-        teammate: {
-          id: chat.bot.id,
-          name: chat.bot.name,
-          picture: teammatePictureUrl(chat.bot),
-        },
+        teammates: chat.bots.map((bot) => ({
+          id: bot.id,
+          name: bot.name,
+          picture: teammatePictureUrl(bot),
+        })),
       }))}
     >
       {children}

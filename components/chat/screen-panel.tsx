@@ -1,5 +1,6 @@
 "use client"
 
+import type RFB from "@novnc/novnc"
 import {
   ArrowCounterClockwiseIcon,
   ArrowsInIcon,
@@ -8,7 +9,7 @@ import {
   PauseIcon,
   XIcon,
 } from "@phosphor-icons/react/ssr"
-import { useEffect, useState } from "react"
+import { useEffect, useEffectEvent, useRef, useState } from "react"
 import {
   giveBackControlOfScreen,
   openScreen,
@@ -41,7 +42,6 @@ function fitScreen(frame: HTMLDivElement) {
       0,
       Math.min(crisp, width / SCREEN.width, height / SCREEN.height)
     )
-    bounds.style.setProperty("--screen-scale", String(scale))
     bounds.style.setProperty("--screen-width", `${SCREEN.width * scale}px`)
   })
   observer.observe(bounds)
@@ -51,25 +51,60 @@ function fitScreen(frame: HTMLDivElement) {
 
 function LiveScreen({
   chatId,
+  botId,
   name,
+  viewOnly,
   onRetry,
 }: {
   chatId: string
+  botId: string
   name: string
+  viewOnly: boolean
   onRetry: () => void
 }) {
-  const [screen, setScreen] = useState<{ url: string } | "loading" | "failed">(
-    "loading"
-  )
+  const view = useRef<HTMLDivElement>(null)
+  const [session, setSession] = useState<RFB>()
+  const [screen, setScreen] = useState<"loading" | "live" | "failed">("loading")
+  const reconnect = useEffectEvent(onRetry)
+
   useEffect(() => {
     let active = true
-    callAction(() => openScreen(chatId)).then((result) => {
-      if (active) setScreen(result.ok ? { url: result.url } : "failed")
+    let rfb: RFB | undefined
+    Promise.all([
+      callAction(() => openScreen(chatId, botId)),
+      import("@novnc/novnc"),
+    ]).then(([result, { default: Client }]) => {
+      if (!active || !view.current) return
+      if (!result.ok) return setScreen("failed")
+      const client = new Client(view.current, result.url, {
+        wsProtocols: ["binary"],
+      })
+      client.viewOnly = true
+      client.scaleViewport = true
+      client.qualityLevel = 9
+      client.background = "var(--color-screen)"
+      let live = false
+      client.addEventListener("connect", () => {
+        live = true
+        setScreen("live")
+      })
+      client.addEventListener("disconnect", () => {
+        if (!active) return
+        if (live) reconnect()
+        else setScreen("failed")
+      })
+      rfb = client
+      setSession(client)
     })
     return () => {
       active = false
+      rfb?.disconnect()
     }
-  }, [chatId])
+  }, [chatId, botId])
+
+  useEffect(() => {
+    if (session) session.viewOnly = viewOnly
+  }, [session, viewOnly])
 
   if (screen === "failed") {
     return (
@@ -88,22 +123,16 @@ function LiveScreen({
     <div className="grid place-items-center bg-screen p-3">
       <div
         ref={fitScreen}
-        className="relative grid aspect-16/10 w-(--screen-width) place-items-center overflow-hidden rounded-xs"
+        className="relative aspect-16/10 w-(--screen-width) overflow-hidden rounded-xs"
       >
-        {screen === "loading" ? (
-          <Spinner
-            aria-label={`Starting ${name}'s computer`}
-            className="size-5 text-ink-3"
-          />
-        ) : (
-          <iframe
-            src={screen.url}
-            title={`${name}'s screen`}
-            sandbox="allow-scripts allow-same-origin allow-forms"
-            referrerPolicy="no-referrer"
-            scrolling="no"
-            className="absolute top-0 left-0 h-200 w-320 origin-top-left scale-(--screen-scale)"
-          />
+        <div ref={view} className="size-full" />
+        {screen === "loading" && (
+          <div className="absolute inset-0 grid place-items-center">
+            <Spinner
+              aria-label={`Starting ${name}'s computer`}
+              className="size-5 text-ink-3"
+            />
+          </div>
         )}
       </div>
     </div>
@@ -135,7 +164,7 @@ export function ScreenPanel({
 
   function giveBack() {
     run(async () => {
-      const result = await giveBackControlOfScreen(chatId)
+      const result = await giveBackControlOfScreen(chatId, teammate.id)
       if (result.control && !working) onHandedBack(result.control)
       return result
     })
@@ -184,7 +213,9 @@ export function ScreenPanel({
                 variant="secondary"
                 size="sm"
                 disabled={pending}
-                onClick={() => run(() => takeControlOfScreen(chatId))}
+                onClick={() =>
+                  run(() => takeControlOfScreen(chatId, teammate.id))
+                }
               >
                 <HandPalmIcon weight="duotone" data-icon="inline-start" />
                 Take control
@@ -222,9 +253,11 @@ export function ScreenPanel({
             </div>
           )}
           <LiveScreen
-            key={`${inControl}-${attempt}`}
+            key={`${teammate.id}-${attempt}`}
             chatId={chatId}
+            botId={teammate.id}
             name={name}
+            viewOnly={!inControl}
             onRetry={() => setAttempt((value) => value + 1)}
           />
           <p className="px-4 py-2.5 text-caption text-ink-3">

@@ -106,6 +106,7 @@ async function list(provider: Provider) {
 
 export function createAiGatewayCatalog(): ModelCatalog {
   return {
+    list,
     async listAll() {
       const lists = await Promise.all(PROVIDERS.map(list))
       return Object.fromEntries(

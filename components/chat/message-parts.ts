@@ -1,11 +1,24 @@
 import { isToolUIPart } from "ai"
-import type { QueueEvent, TeammateMessage, TurnNotice } from "@/lib/chat"
+import {
+  PASSED_BACK,
+  type QueueEvent,
+  type TeammateMessage,
+  type TurnNotice,
+} from "@/lib/chat"
+import { siteOf } from "@/lib/format"
 
 type Part = TeammateMessage["parts"][number]
 
 type StepState = "running" | "done" | "failed"
 
-type ScreenVerb = "look" | "click" | "type" | "scroll" | "move" | "wait"
+type ScreenVerb =
+  | "look"
+  | "open"
+  | "click"
+  | "type"
+  | "scroll"
+  | "move"
+  | "wait"
 
 export type Shot = { id: string; width: number; height: number }
 
@@ -14,6 +27,8 @@ export type Step = { key: string; state: StepState } & (
   | { kind: "remember" | "forget"; content?: string }
   | { kind: "command"; purpose?: string; command?: string; output?: string }
   | { kind: "read" | "save" | "look"; name?: string }
+  | { kind: "search"; query?: string }
+  | { kind: "fetch"; site?: string; title?: string }
   | {
       kind: "screen"
       verb: ScreenVerb
@@ -23,11 +38,13 @@ export type Step = { key: string; state: StepState } & (
       at?: { x: number; y: number }
     }
   | { kind: "control" }
+  | { kind: "handoff"; to: string; back: boolean }
 )
 
 const screenVerbs: Record<string, ScreenVerb> = {
   screenshot: "look",
   cursor_position: "look",
+  open_url: "open",
   click: "click",
   left_click: "click",
   right_click: "click",
@@ -67,9 +84,11 @@ function screenStep(part: ComputerPart): Step {
         ? generic.text
         : generic && "keys" in generic
           ? generic.keys
-          : input && "text" in input
-            ? input.text
-            : undefined,
+          : generic && "url" in generic
+            ? generic.url
+            : input && "text" in input
+              ? input.text
+              : undefined,
     shot:
       part.state === "output-available" ? part.output.screenshot : undefined,
     at: typeof x === "number" && typeof y === "number" ? { x, y } : undefined,
@@ -90,7 +109,11 @@ function toolState(state: string): StepState {
   return "running"
 }
 
-function stepOf(part: Part, index: number): Step | null {
+function stepOf(
+  part: Part,
+  index: number,
+  names: Map<string, string>
+): Step | null {
   switch (part.type) {
     case "reasoning":
       return {
@@ -148,8 +171,35 @@ function stepOf(part: Part, index: number): Step | null {
             ? undefined
             : fileName(part.input?.path ?? "."),
       }
+    case "tool-web_search":
+      return {
+        key: part.toolCallId,
+        kind: "search",
+        state: toolState(part.state),
+        query: part.input?.query,
+      }
+    case "tool-web_fetch":
+      return {
+        key: part.toolCallId,
+        kind: "fetch",
+        state: toolState(part.state),
+        site:
+          part.input?.url === undefined ? undefined : siteOf(part.input.url),
+        title:
+          part.state === "output-available"
+            ? (part.output.title ?? undefined)
+            : undefined,
+      }
     case "tool-computer":
       return screenStep(part)
+    case "tool-handoff":
+      return {
+        key: part.toolCallId,
+        kind: "handoff",
+        state: toolState(part.state),
+        to: names.get(part.input?.toBotId ?? "") ?? "a teammate",
+        back: part.state === "output-error" && part.errorText === PASSED_BACK,
+      }
     case "data-control":
       return {
         key: part.id ?? `control-${index}`,
@@ -198,7 +248,10 @@ function approvalOf(
   }
 }
 
-export function readMessage(message: TeammateMessage) {
+export function readMessage(
+  message: TeammateMessage,
+  names: Map<string, string>
+) {
   const notices: TurnNotice[] = []
   let queue: QueueEvent | undefined
   const answeredAt = new Map<string, number>()
@@ -225,7 +278,7 @@ export function readMessage(message: TeammateMessage) {
       queue = part.data
       continue
     }
-    const step = stepOf(part, index)
+    const step = stepOf(part, index, names)
     if (!step) continue
     const approval = approvalOf(part)
     if (approval) {

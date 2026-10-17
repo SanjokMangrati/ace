@@ -7,6 +7,7 @@ import {
 } from "ai"
 import { z } from "zod"
 import type { ToolGroup } from "@/lib/bot-schemas"
+import type { CatalogModel, Provider } from "@/lib/models"
 import { truncateMiddle } from "@/server/agent/sandbox-tools"
 import type { toolRisk } from "@/server/db/schema"
 
@@ -29,7 +30,13 @@ const NATIVE_CLICKS = new Set([
   "triple_click",
 ])
 const SCREEN_CHANGES = new Set(["click", "drag", "type", "key"])
-const JUDGED_SCREEN = new Set(["click", "type", "key"])
+const JUDGED_SCREEN = new Set(["click", "type"])
+const SUBMITS = /(^|[\s+])(enter|return)($|[\s+])/i
+const JUDGE_FAMILY: Partial<Record<Provider, RegExp>> = {
+  anthropic: /haiku/,
+  openai: /mini/,
+  google: /flash(?!-lite)/,
+}
 
 const SECRET_PATH =
   /(^|[\s/"'=:])(\.ssh(\/|\s|$)|\.env(\.\w+)?(\s|$|["'])|\.aws\/credentials|\.config\/gcloud|\.azure\/|\.kube\/config|\.docker\/config\.json|\.netrc|\.npmrc|\.pypirc|\.git-credentials|\.gnupg|\.password-store|id_(rsa|ed25519|ecdsa|dsa)\b|\S+\.pem\b|\/etc\/shadow|Login Data|Cookies(\s|$))/
@@ -109,26 +116,36 @@ function field(input: unknown, key: string) {
   return typeof value === "string" ? value : undefined
 }
 
-function screenAction(input: unknown) {
-  const action =
-    typeof input === "object" && input !== null && "action" in input
-      ? input.action
-      : undefined
+type ScreenAction = { type: string; text: string | undefined }
+
+function screenActions(input: unknown): ScreenAction[] {
+  const call =
+    typeof input === "object" && input !== null
+      ? (input as Record<string, unknown>)
+      : {}
+  const action = call.action
   if (typeof action === "object" && action !== null) {
-    return {
-      type: field(action, "type") ?? "",
-      text: field(action, "text") ?? field(action, "keys"),
-    }
+    const andThen = Array.isArray(call.andThen) ? call.andThen : []
+    return [action, ...andThen].map((step) => ({
+      type: field(step, "type") ?? "",
+      text: field(step, "text") ?? field(step, "keys"),
+    }))
   }
   const name = String(action)
-  return {
-    type: NATIVE_CLICKS.has(name)
-      ? "click"
-      : name === "left_click_drag"
-        ? "drag"
-        : name,
-    text: field(input, "text"),
-  }
+  return [
+    {
+      type: NATIVE_CLICKS.has(name)
+        ? "click"
+        : name === "left_click_drag"
+          ? "drag"
+          : name,
+      text: field(input, "text"),
+    },
+  ]
+}
+
+function submits(action: ScreenAction) {
+  return action.type === "key" && SUBMITS.test(action.text ?? "")
 }
 
 export function toolGroup({ toolName, input }: ToolCallInfo): ToolGroup | null {
@@ -144,8 +161,14 @@ export function toolGroup({ toolName, input }: ToolCallInfo): ToolGroup | null {
     case "note_update":
     case "note_delete":
       return "notes"
+    case "handoff":
+      return "handoff"
     case "computer":
-      return SCREEN_CHANGES.has(screenAction(input).type) ? "computer" : null
+      return screenActions(input).some((action) =>
+        SCREEN_CHANGES.has(action.type)
+      )
+        ? "computer"
+        : null
     default:
       return null
   }
@@ -165,10 +188,12 @@ export function riskRule({ toolName, input }: ToolCallInfo): string | null {
       : null
   }
   if (toolName === "computer") {
-    const action = screenAction(input)
-    return action.type === "type" &&
-      action.text &&
-      (SECRET_TEXT.test(action.text) || isCardNumber(action.text))
+    return screenActions(input).some(
+      (action) =>
+        action.type === "type" &&
+        action.text &&
+        (SECRET_TEXT.test(action.text) || isCardNumber(action.text))
+    )
       ? "This types something that looks like a password, key or card number."
       : null
   }
@@ -179,9 +204,23 @@ export function isJudged({ toolName, input }: ToolCallInfo) {
   if (toolName === "shell") return true
   if (toolName === "fs_write")
     return !WORKSPACE.test(field(input, "path") ?? "")
-  if (toolName === "computer")
-    return JUDGED_SCREEN.has(screenAction(input).type)
+  if (toolName === "computer") {
+    return screenActions(input).some(
+      (action) => JUDGED_SCREEN.has(action.type) || submits(action)
+    )
+  }
   return false
+}
+
+export function judgeModelFor(
+  provider: Provider,
+  models: readonly CatalogModel[],
+  fallback: string
+) {
+  const family = JUDGE_FAMILY[provider]
+  const pick =
+    family && models.find((model) => model.vision && family.test(model.id))
+  return pick?.id ?? fallback
 }
 
 function latestScreenshot(messages: readonly ModelMessage[]) {

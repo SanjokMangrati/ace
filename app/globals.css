@@ -189,6 +189,12 @@
     scrollbar-color: auto;
   }
 
+  @supports not selector(::-webkit-scrollbar) {
+    &:not(:hover) {
+      scrollbar-color: transparent transparent;
+    }
+  }
+
   &::-webkit-scrollbar {
     width: 10px;
     height: 0;
@@ -208,6 +214,10 @@
 
   &::-webkit-scrollbar-thumb:hover {
     background-color: var(--ink-3);
+  }
+
+  &:not(:hover)::-webkit-scrollbar-thumb {
+    background-color: transparent;
   }
 }
 

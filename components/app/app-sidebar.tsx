@@ -18,6 +18,7 @@ import { Wordmark } from "@/components/brand/wordmark"
 import {
   Avatar,
   AvatarFallback,
+  AvatarGroup,
   AvatarImage,
   TeammateAvatar,
 } from "@/components/ui/avatar"
@@ -52,8 +53,10 @@ export type SidebarChat = {
   queued: boolean
   needsYou: boolean
   inControl: boolean
-  teammate: { id: string; name: string; picture: string | null }
+  teammates: { id: string; name: string; picture: string | null }[]
 }
+
+const SIDEBAR_FACES = 2
 
 const rowClasses =
   "flex items-center gap-2.5 rounded-sm px-2.5 text-small text-ink-2 transition duration-150 ease-out hover:bg-fill hover:text-ink aria-[current=page]:bg-sun-soft aria-[current=page]:text-ink aria-[current=page]:hover:bg-sun-soft"
@@ -91,6 +94,22 @@ function useSignOut() {
   }
 
   return { signingOut, signOut }
+}
+
+function ChatAvatars({ chat }: { chat: SidebarChat }) {
+  return (
+    <AvatarGroup>
+      {chat.teammates.slice(0, SIDEBAR_FACES).map((teammate) => (
+        <TeammateAvatar
+          key={teammate.id}
+          botId={teammate.id}
+          name={teammate.name}
+          picture={teammate.picture}
+          size="xs"
+        />
+      ))}
+    </AvatarGroup>
+  )
 }
 
 function YouAvatar({ user }: { user: AuthUser }) {
@@ -181,12 +200,7 @@ function ChatRow({
         )}
       >
         <span className="flex w-10 shrink-0">
-          <TeammateAvatar
-            botId={chat.teammate.id}
-            name={chat.teammate.name}
-            picture={chat.teammate.picture}
-            size="xs"
-          />
+          <ChatAvatars chat={chat} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate">{chat.title}</span>
@@ -219,7 +233,7 @@ function ChatRow({
       <DeleteChatDialog
         chatId={chat.id}
         title={chat.title}
-        teammateName={chat.teammate.name}
+        teammateNames={chat.teammates.map((teammate) => teammate.name)}
         active={active}
         open={deleting}
         onOpenChange={setDeleting}
@@ -332,12 +346,7 @@ function SidebarRail({
                   }
                   className="group/row min-h-12 aria-[current=page]:bg-sun-soft"
                 >
-                  <TeammateAvatar
-                    botId={chat.teammate.id}
-                    name={chat.teammate.name}
-                    picture={chat.teammate.picture}
-                    size="xs"
-                  />
+                  <ChatAvatars chat={chat} />
                   <span className="flex min-w-0 flex-1 flex-col gap-px">
                     <span className="truncate text-small">{chat.title}</span>
                     <ChatStatus chat={chat} status={liveStatus(chat, live)} />

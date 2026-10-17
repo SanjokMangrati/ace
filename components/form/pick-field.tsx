@@ -35,16 +35,26 @@ export function PickField<TValues extends FieldValues>({
         <FieldSet data-invalid={fieldState.invalid} className="gap-0">
           <FieldLegend className="sr-only">{label}</FieldLegend>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {options.map((option) => (
-              <PickCard
-                key={option.value}
-                pressed={field.value === option.value}
-                onClick={() => field.onChange(option.value)}
-                media={option.media}
-                title={option.title}
-                description={option.description}
-              />
-            ))}
+            {options.map((option) => {
+              const picked: string[] = field.value
+              const pressed = picked.includes(option.value)
+              return (
+                <PickCard
+                  key={option.value}
+                  pressed={pressed}
+                  onClick={() =>
+                    field.onChange(
+                      pressed
+                        ? picked.filter((value) => value !== option.value)
+                        : [...picked, option.value]
+                    )
+                  }
+                  media={option.media}
+                  title={option.title}
+                  description={option.description}
+                />
+              )
+            })}
             {children}
           </div>
           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

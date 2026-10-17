@@ -19,6 +19,7 @@ import { List, ListRow, ListRowText } from "@/components/ui/list"
 import { Spinner } from "@/components/ui/spinner"
 import { Tile, type TileColor } from "@/components/ui/tile"
 import { useAction } from "@/lib/action-client"
+import { nameList } from "@/lib/chat"
 import { teammateCount } from "@/lib/format"
 import type { Provider } from "@/lib/models"
 import type { ProviderKeyOption } from "@/lib/provider-display"
@@ -30,11 +31,6 @@ const tileColors: Record<Provider, TileColor> = {
   openai: "mint",
   google: "sky",
   openai_compatible: "grape",
-}
-
-function joinNames(names: string[]) {
-  if (names.length <= 1) return names.join("")
-  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
 }
 
 function RemoveKey({ row }: { row: ProviderKeyRow }) {
@@ -63,7 +59,7 @@ function RemoveKey({ row }: { row: ProviderKeyRow }) {
           <AlertDialogTitle>Remove your {row.label} key?</AlertDialogTitle>
           <AlertDialogDescription>
             {used
-              ? `${joinNames(row.usedBy)} ${row.usedBy.length === 1 ? "uses" : "use"} this key. Until you pick another key in their settings, they can't work.`
+              ? `${nameList(row.usedBy)} ${row.usedBy.length === 1 ? "uses" : "use"} this key. Until you pick another key in their settings, they can't work.`
               : "Ace deletes the key for good. You can add it again later."}
           </AlertDialogDescription>
           {error && <FieldError>{error}</FieldError>}

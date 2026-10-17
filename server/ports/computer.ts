@@ -31,6 +31,7 @@ export type ComputerAction =
   | { type: "type"; text: string }
   | { type: "key"; keys: string; repeat?: number }
   | { type: "wait"; seconds: number }
+  | { type: "open_url"; url: string }
   | { type: "cursor_position" }
 
 export type ComputerOutput = {
@@ -40,7 +41,7 @@ export type ComputerOutput = {
 }
 
 export type ComputerHandlers = {
-  execute(action: ComputerAction): Promise<ComputerOutput>
+  execute(actions: ComputerAction[]): Promise<ComputerOutput>
   toModelOutput(output: ComputerOutput): Promise<ToolResultPart["output"]>
 }
 

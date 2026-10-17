@@ -41,16 +41,17 @@ export default async function ChatPage({
       key={chat.id}
       chatId={chat.id}
       title={chat.title}
-      teammate={{
-        id: chat.bot.id,
-        name: chat.bot.name,
-        picture: teammatePictureUrl(chat.bot),
-        connected: chat.bot.connected,
-        fullAuto: chat.bot.fullAuto,
-      }}
+      teammates={chat.bots.map((bot) => ({
+        id: bot.id,
+        name: bot.name,
+        picture: teammatePictureUrl(bot),
+        connected: bot.connected,
+        fullAuto: bot.fullAuto,
+      }))}
+      lastBotId={chat.lastBotId}
+      controlBotId={chat.controlBotId}
       initialMessages={chat.messages}
       session={session}
-      inControl={chat.control === "user"}
     />
   )
 }

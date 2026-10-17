@@ -6,11 +6,13 @@ import {
   type Sandbox as DaytonaSandbox,
 } from "@daytona/sdk"
 import type { Desktop, Sandbox, SandboxProvider } from "@/server/ports/sandbox"
+import { shellQuote } from "@/server/sandbox/shell"
 
 const START_TIMEOUT_SEC = 300
 const USD_PER_VCPU_HOUR = 0.0504
 const USD_PER_GIB_HOUR = 0.0162
 const NOVNC_PORT = 6080
+const OPEN_TIMEOUT_SEC = 20
 
 async function startDesktop(sandbox: DaytonaSandbox): Promise<Desktop> {
   const { computerUse } = sandbox
@@ -50,16 +52,21 @@ async function startDesktop(sandbox: DaytonaSandbox): Promise<Desktop> {
       const { x = 0, y = 0 } = await computerUse.mouse.getPosition()
       return { x, y }
     },
-    liveView: async (mode, ttlSec) => {
+    open: async (url) => {
+      const page = new URL(url)
+      if (page.protocol !== "https:" && page.protocol !== "http:") {
+        throw new Error("Only web pages can be opened.")
+      }
+      await sandbox.process.executeCommand(
+        `nohup chromium -- ${shellQuote(page.href)} >/dev/null 2>&1 &`,
+        undefined,
+        undefined,
+        OPEN_TIMEOUT_SEC
+      )
+    },
+    liveView: async (ttlSec) => {
       const { url } = await sandbox.getSignedPreviewUrl(NOVNC_PORT, ttlSec)
-      const params = new URLSearchParams({
-        autoconnect: "true",
-        reconnect: "true",
-        resize: "scale",
-        quality: "9",
-        view_only: String(mode === "view"),
-      })
-      return `${url}/vnc.html?${params}`
+      return `${url.replace(/^http/, "ws")}/websockify`
     },
   }
 }

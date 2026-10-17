@@ -11,8 +11,9 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message"
 import { TeammateAvatar } from "@/components/ui/avatar"
-import type { TeammateMessage } from "@/lib/chat"
+import { messageText, splitMentions, type TeammateMessage } from "@/lib/chat"
 import { Activity } from "./activity"
+import { HandoffCard } from "./handoff-card"
 import { readMessage, type Segment } from "./message-parts"
 import { PermissionCard } from "./permission-card"
 import { Time } from "./time"
@@ -70,22 +71,46 @@ function ControlEvents({
 
 export function YourMessage({
   message,
-  teammateName,
+  teammates,
 }: {
   message: TeammateMessage
-  teammateName: string
+  teammates: ChatTeammate[]
 }) {
-  const control = message.metadata?.control
-  if (control) return <ControlEvents teammateName={teammateName} {...control} />
-  const text = message.parts
-    .map((part) => (part.type === "text" ? part.text : ""))
-    .join("")
+  const byId = (id: string | undefined) =>
+    teammates.find((teammate) => teammate.id === id)
+  const { control, handoff } = message.metadata ?? {}
+  if (control) {
+    return (
+      <ControlEvents
+        teammateName={(byId(control.botId) ?? teammates[0]).name}
+        {...control}
+      />
+    )
+  }
+  const from = byId(handoff?.fromBotId)
+  const to = byId(handoff?.toBotId)
+  if (handoff && from && to) {
+    return <HandoffCard handoff={handoff} from={from} to={to} />
+  }
+  const text = messageText(message)
+  const pieces =
+    teammates.length > 1
+      ? splitMentions(text, teammates)
+      : [{ at: 0, text, mention: false }]
 
   return (
     <Message from="user">
       <div className="flex max-w-5/6 flex-col items-end">
         <div className="max-w-140 rounded-lg rounded-br-xs bg-sun-soft px-4 py-3 text-prose wrap-break-word whitespace-pre-wrap text-ink">
-          {text}
+          {pieces.map((piece) =>
+            piece.mention ? (
+              <b key={piece.at} className="font-semibold">
+                {piece.text}
+              </b>
+            ) : (
+              <Fragment key={piece.at}>{piece.text}</Fragment>
+            )
+          )}
         </div>
         <Time
           at={message.metadata?.createdAt}
@@ -98,6 +123,7 @@ export function YourMessage({
 
 export function TeammateReply({
   teammate,
+  team,
   message,
   working,
   error,
@@ -105,6 +131,7 @@ export function TeammateReply({
   onAnswer,
 }: {
   teammate: ChatTeammate
+  team: ChatTeammate[]
   message: TeammateMessage | undefined
   working: boolean
   error?: string
@@ -112,7 +139,7 @@ export function TeammateReply({
   onAnswer?: (approvalId: string, approved: boolean) => void
 }) {
   const { segments, notices, queue } = message
-    ? readMessage(message)
+    ? readMessage(message, new Map(team.map((bot) => [bot.id, bot.name])))
     : { segments: [EMPTY], notices: [], queue: undefined }
   const upNext = working && queue?.startedAt === undefined ? queue : undefined
   if (error && !notices.some((notice) => notice.reason === "error")) {

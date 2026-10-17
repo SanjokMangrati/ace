@@ -29,7 +29,14 @@ afterEach(cleanup)
 
 describe("TeammateReply while up next", () => {
   it("says which chat goes first", () => {
-    render(<TeammateReply teammate={teammate} message={reply(queue)} working />)
+    render(
+      <TeammateReply
+        teammate={teammate}
+        team={[teammate]}
+        message={reply(queue)}
+        working
+      />
+    )
     expect(screen.getByRole("alert").textContent).toBe(
       "Researcher is finishing Q3 vendor spend report first. It'll start on this right after."
     )
@@ -39,6 +46,7 @@ describe("TeammateReply while up next", () => {
     render(
       <TeammateReply
         teammate={teammate}
+        team={[teammate]}
         message={reply({ ...queue, waitingOn: "control" })}
         working
       />
@@ -55,6 +63,7 @@ describe("TeammateReply while up next", () => {
     render(
       <TeammateReply
         teammate={teammate}
+        team={[teammate]}
         message={reply({ ...queue, startedAt: 1 })}
         working
       />
@@ -93,6 +102,7 @@ describe("TeammateReply asking for permission", () => {
     render(
       <TeammateReply
         teammate={teammate}
+        team={[teammate]}
         message={asking({})}
         working={false}
         onAnswer={(id, approved) => answers.push([id, approved])}
@@ -115,6 +125,7 @@ describe("TeammateReply asking for permission", () => {
     render(
       <TeammateReply
         teammate={{ ...teammate, fullAuto: true }}
+        team={[teammate]}
         message={asking({ requestReason: "This could send your files." })}
         working={false}
         onAnswer={() => {}}
@@ -131,6 +142,7 @@ describe("TeammateReply asking for permission", () => {
     render(
       <TeammateReply
         teammate={teammate}
+        team={[teammate]}
         message={asking({ approved: true }, "approval-responded")}
         working
       />

@@ -39,6 +39,14 @@ describe("systemPrompt", () => {
     )
   })
 
+  it("teaches screen habits only when the model can see the screen", () => {
+    expect(systemPrompt({ ...bot, notes: [] })).toContain("open_url")
+    expect(systemPrompt({ ...bot, notes: [] })).toContain("web_search")
+    expect(
+      systemPrompt({ ...bot, canSeeScreen: false, notes: [] })
+    ).not.toContain("open_url")
+  })
+
   it("adds the person's instructions only when there are some", () => {
     expect(systemPrompt({ ...bot, notes: [] })).not.toContain("How this person")
     expect(

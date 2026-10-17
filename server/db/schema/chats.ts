@@ -23,6 +23,7 @@ export const turnEndReason = pgEnum("turn_end_reason", [
   "step_limit",
   "task_budget",
   "daily_budget",
+  "handoff",
   "error",
 ])
 
@@ -38,9 +39,6 @@ export const chat = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    botId: uuid("bot_id")
-      .notNull()
-      .references(() => bot.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     runtimeState: jsonb("runtime_state"),
     runtimeCursors: jsonb("runtime_cursors").$type<RuntimeCursors>(),
@@ -52,7 +50,23 @@ export const chat = pgTable(
   },
   (table) => [
     index("chat_userId_updatedAt_idx").on(table.userId, table.updatedAt),
-    index("chat_botId_idx").on(table.botId),
+  ]
+)
+
+export const chatMember = pgTable(
+  "chat_member",
+  {
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    botId: uuid("bot_id")
+      .notNull()
+      .references(() => bot.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.chatId, table.botId] }),
+    index("chat_member_botId_idx").on(table.botId),
   ]
 )
 
@@ -174,11 +188,44 @@ export const screenshot = pgTable(
   ]
 )
 
+export const handoff = pgTable(
+  "handoff",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    userMessageId: text("user_message_id").notNull(),
+    fromBotId: uuid("from_bot_id")
+      .notNull()
+      .references(() => bot.id, { onDelete: "cascade" }),
+    toBotId: uuid("to_bot_id")
+      .notNull()
+      .references(() => bot.id, { onDelete: "cascade" }),
+    summary: text("summary").notNull(),
+    nextStep: text("next_step").notNull(),
+    accepted: boolean("accepted").notNull(),
+    rejectReason: text("reject_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("handoff_chatId_userMessageId_idx").on(
+      table.chatId,
+      table.userMessageId
+    ),
+  ]
+)
+
 export const chatRelations = relations(chat, ({ one, many }) => ({
   user: one(user, { fields: [chat.userId], references: [user.id] }),
-  bot: one(bot, { fields: [chat.botId], references: [bot.id] }),
+  members: many(chatMember),
   messages: many(message),
   turns: many(turn),
+}))
+
+export const chatMemberRelations = relations(chatMember, ({ one }) => ({
+  chat: one(chat, { fields: [chatMember.chatId], references: [chat.id] }),
+  bot: one(bot, { fields: [chatMember.botId], references: [bot.id] }),
 }))
 
 export const messageRelations = relations(message, ({ one }) => ({

@@ -85,7 +85,7 @@ export function anthropicComputerTool(
   { execute, toModelOutput }: ComputerHandlers
 ) {
   const handlers = {
-    execute: (input: AnthropicInput) => execute(toComputerAction(input)),
+    execute: (input: AnthropicInput) => execute([toComputerAction(input)]),
     toModelOutput: ({ output }: { output: ComputerOutput }) =>
       toModelOutput(output),
   }

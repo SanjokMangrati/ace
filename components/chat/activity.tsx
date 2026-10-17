@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  ArrowRightIcon,
   BrainIcon,
   CaretDownIcon,
   CaretRightIcon,
@@ -11,9 +12,11 @@ import {
   FileTextIcon,
   FloppyDiskIcon,
   FolderOpenIcon,
+  GlobeSimpleIcon,
   HandPalmIcon,
   KeyboardIcon,
   LightbulbIcon,
+  MagnifyingGlassIcon,
   MonitorIcon,
   PauseCircleIcon,
   TerminalWindowIcon,
@@ -50,6 +53,11 @@ const screenWords = {
     running: "Looking at the screen",
     done: "Looked at the screen",
     failed: "Couldn't see the screen",
+  },
+  open: {
+    running: "Opening a page",
+    done: "Opened a page",
+    failed: "Couldn't open the page",
   },
   click: {
     running: "Clicking",
@@ -116,6 +124,50 @@ function sentence(step: Step) {
       if (step.state === "failed") return `Couldn't run the command${purpose}`
       return `Ran a command${purpose}`
     }
+    case "handoff":
+      if (step.state === "running") return `Passing this to ${step.to}…`
+      if (step.state === "failed") {
+        return `Tried to ${step.back ? "hand this back" : "pass this"} to ${step.to}, so kept working on it instead.`
+      }
+      return (
+        <>
+          Passed this to <b>{step.to}</b>
+        </>
+      )
+    case "search":
+      if (step.state === "running") {
+        return (
+          <>
+            Searching the web for <b>{step.query}</b>…
+          </>
+        )
+      }
+      if (step.state === "failed") return "Couldn't search the web"
+      return (
+        <>
+          Searched the web for <b>{step.query}</b>
+        </>
+      )
+    case "fetch":
+      if (step.state === "running") {
+        return (
+          <>
+            Reading <b>{step.site}</b>…
+          </>
+        )
+      }
+      if (step.state === "failed") {
+        return (
+          <>
+            Couldn't read <b>{step.site}</b>
+          </>
+        )
+      }
+      return (
+        <>
+          Read <b>{step.title ?? step.site}</b>
+        </>
+      )
     case "read":
     case "save":
     case "look": {
@@ -137,10 +189,14 @@ const stepTiles = {
   read: { color: "sky", Icon: FileTextIcon },
   save: { color: "sky", Icon: FloppyDiskIcon },
   look: { color: "sky", Icon: FolderOpenIcon },
+  search: { color: "mint", Icon: MagnifyingGlassIcon },
+  fetch: { color: "mint", Icon: GlobeSimpleIcon },
+  handoff: { color: "bubblegum", Icon: ArrowRightIcon },
 } as const
 
 const screenIcons = {
   look: MonitorIcon,
+  open: GlobeSimpleIcon,
   click: CursorClickIcon,
   type: KeyboardIcon,
   scroll: CursorClickIcon,

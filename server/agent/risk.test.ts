@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isJudged, riskRule, toolGroup } from "./risk"
+import { isJudged, judgeModelFor, riskRule, toolGroup } from "./risk"
 
 const shell = (command: string) => ({ toolName: "shell", input: { command } })
 const screen = (action: object) => ({
@@ -83,6 +83,12 @@ describe("isJudged", () => {
       isJudged({ toolName: "computer", input: { action: "left_click" } })
     ).toBe(true)
     expect(isJudged(screen({ type: "screenshot" }))).toBe(false)
+    expect(isJudged(screen({ type: "key", keys: "ctrl+l" }))).toBe(false)
+    expect(isJudged(screen({ type: "key", keys: "enter" }))).toBe(true)
+    expect(isJudged(screen({ type: "key", keys: "ctrl+Return" }))).toBe(true)
+    expect(
+      isJudged({ toolName: "computer", input: { action: "key", text: "Tab" } })
+    ).toBe(false)
     expect(isJudged({ toolName: "fs_read", input: { path: "/etc" } })).toBe(
       false
     )
@@ -99,5 +105,85 @@ describe("toolGroup", () => {
     expect(
       toolGroup({ toolName: "computer", input: { action: "screenshot" } })
     ).toBeNull()
+  })
+})
+
+describe("batched screen actions", () => {
+  const batch = (action: object, andThen: object[]) => ({
+    toolName: "computer",
+    input: { intent: "Did it", action, andThen },
+  })
+
+  it("judges a batch when any step clicks, types or submits", () => {
+    expect(
+      isJudged(
+        batch({ type: "key", keys: "ctrl+l" }, [{ type: "key", keys: "enter" }])
+      )
+    ).toBe(true)
+    expect(
+      isJudged(batch({ type: "scroll" }, [{ type: "key", keys: "ctrl+l" }]))
+    ).toBe(false)
+  })
+
+  it("flags a secret typed anywhere in the batch", () => {
+    expect(
+      riskRule(
+        batch({ type: "click", x: 1, y: 1 }, [
+          { type: "type", text: "4242 4242 4242 4242" },
+        ])
+      )
+    ).not.toBeNull()
+  })
+
+  it("asks about the batch when any step changes the screen", () => {
+    expect(
+      toolGroup(batch({ type: "screenshot" }, [{ type: "type", text: "hi" }]))
+    ).toBe("computer")
+    expect(
+      toolGroup(batch({ type: "screenshot" }, [{ type: "wait" }]))
+    ).toBeNull()
+  })
+})
+
+describe("judgeModelFor", () => {
+  const model = (id: string, vision = true) => ({
+    id,
+    label: id,
+    vision,
+    inputUsdPerMTok: 1,
+    outputUsdPerMTok: 1,
+  })
+
+  it("picks the newest small model that can see the screen", () => {
+    expect(
+      judgeModelFor(
+        "anthropic",
+        [
+          model("claude-opus-5-5"),
+          model("claude-haiku-5-5"),
+          model("claude-haiku-4-5"),
+        ],
+        "claude-opus-5-5"
+      )
+    ).toBe("claude-haiku-5-5")
+    expect(
+      judgeModelFor(
+        "openai",
+        [model("gpt-6-mini", false), model("gpt-5-mini")],
+        "gpt-6"
+      )
+    ).toBe("gpt-5-mini")
+    expect(
+      judgeModelFor(
+        "google",
+        [model("gemini-3-flash-lite"), model("gemini-3-flash")],
+        "x"
+      )
+    ).toBe("gemini-3-flash")
+  })
+
+  it("falls back to the bot's model when none fits", () => {
+    expect(judgeModelFor("openai_compatible", [], "my-model")).toBe("my-model")
+    expect(judgeModelFor("openai", [model("gpt-6")], "gpt-6")).toBe("gpt-6")
   })
 })

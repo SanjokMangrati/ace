@@ -1,26 +1,25 @@
-import { PGlite } from "@electric-sql/pglite"
 import type { UIMessage } from "ai"
-import { pushSchema } from "drizzle-kit/api"
 import { eq } from "drizzle-orm"
-import { drizzle } from "drizzle-orm/pglite"
 import { beforeAll, describe, expect, it, vi } from "vitest"
+import { db } from "@/server/db/client"
 import * as schema from "@/server/db/schema"
-
-const db = drizzle({ client: new PGlite(), schema })
-
-vi.mock("server-only", () => ({}))
-vi.mock("@/server/db/client", () => ({ db }))
-
-const {
+import {
   endRunningTurns,
+  findChatBotIds,
+  findChatTeam,
+  insertChat,
+  insertHandoff,
   listChats,
+  listHops,
   loadTranscript,
   pauseTurn,
   resumeTurn,
   saveTranscript,
   startTurn,
-} = await import("./chats")
-const { askApproval, toolCallLedger } = await import("./tool-calls")
+} from "./chats"
+import { askApproval, toolCallLedger } from "./tool-calls"
+
+vi.mock("@/server/db/client")
 
 const normal = () => "normal" as const
 
@@ -37,8 +36,6 @@ async function ids(opts?: { limit?: number; before?: string }) {
 }
 
 beforeAll(async () => {
-  const { apply } = await pushSchema(schema, db as never)
-  await apply()
   await db.insert(schema.user).values({
     id: "user-1",
     name: "Sam",
@@ -54,9 +51,7 @@ beforeAll(async () => {
     })
     .returning({ id: schema.bot.id })
   botId = bot.id
-  await db
-    .insert(schema.chat)
-    .values({ id: chatId, userId: "user-1", botId, title: "Hi" })
+  await insertChat("user-1", { id: chatId, botIds: [botId], title: "Hi" })
 })
 
 describe("transcript storage", () => {
@@ -255,5 +250,74 @@ describe("approvals", () => {
     expect(
       await resumeTurn(chatId, [{ toolCallId: "a", approved: true }])
     ).toBeNull()
+  })
+})
+
+describe("group chats", () => {
+  const groupId = "00000000-0000-4000-8000-000000000002"
+  let writerId: string
+
+  beforeAll(async () => {
+    const [writer] = await db
+      .insert(schema.bot)
+      .values({ userId: "user-1", name: "Writer", job: "Drafts", modelId: "m" })
+      .returning({ id: schema.bot.id })
+    writerId = writer.id
+  })
+
+  it("only adds teammates you own, in the order you picked them", async () => {
+    expect(
+      await insertChat("user-2", {
+        id: groupId,
+        botIds: [botId],
+        title: "Offsite",
+      })
+    ).toBe(false)
+    expect(
+      await insertChat("user-1", {
+        id: groupId,
+        botIds: [writerId, botId],
+        title: "Offsite",
+      })
+    ).toBe(true)
+    const team = await findChatTeam(groupId)
+    expect(team.bots.map((bot) => bot.name)).toEqual(["Writer", "Researcher"])
+    expect(await findChatBotIds("user-1", groupId)).toEqual([writerId, botId])
+    expect(await findChatBotIds("user-2", groupId)).toEqual([])
+  })
+
+  it("remembers who worked last and the accepted hops since your message", async () => {
+    await startTurn(groupId, botId)
+    expect((await findChatTeam(groupId)).lastBotId).toBe(botId)
+
+    const hop = {
+      chatId: groupId,
+      userMessageId: "u1",
+      summary: "Done",
+      nextStep: "Next",
+    }
+    await insertHandoff({
+      ...hop,
+      fromBotId: botId,
+      toBotId: writerId,
+      accepted: true,
+    })
+    await insertHandoff({
+      ...hop,
+      fromBotId: writerId,
+      toBotId: botId,
+      accepted: false,
+      rejectReason: "back",
+    })
+    await insertHandoff({
+      ...hop,
+      userMessageId: "u0",
+      fromBotId: writerId,
+      toBotId: botId,
+      accepted: true,
+    })
+    expect(await listHops(groupId, "u1")).toEqual([
+      { fromBotId: botId, toBotId: writerId },
+    ])
   })
 })
