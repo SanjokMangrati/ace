@@ -2,6 +2,7 @@ import { anthropic } from "@ai-sdk/anthropic"
 import {
   type ComputerAction,
   type ComputerHandlers,
+  type ComputerOutput,
   type NativeComputerInput,
   SCREEN,
 } from "@/server/ports/computer"
@@ -85,11 +86,8 @@ export function anthropicComputerTool(
 ) {
   const handlers = {
     execute: (input: AnthropicInput) => execute(toComputerAction(input)),
-    toModelOutput: ({
-      output,
-    }: {
-      output: Awaited<ReturnType<ComputerHandlers["execute"]>>
-    }) => toModelOutput(output),
+    toModelOutput: ({ output }: { output: ComputerOutput }) =>
+      toModelOutput(output),
   }
   const display = {
     displayWidthPx: SCREEN.width,

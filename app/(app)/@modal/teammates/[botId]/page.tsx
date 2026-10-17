@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
+import { cache } from "react"
 import { Section } from "@/components/app/page"
 import { RouteModal } from "@/components/app/route-modal"
 import { DeleteTeammate } from "@/components/teammates/delete-teammate"
@@ -15,27 +16,26 @@ import { listProviderKeys } from "@/server/db/queries/provider-keys"
 import { env } from "@/server/env"
 import { requireUser } from "@/server/session"
 
-async function loadBot(params: PageProps<"/teammates/[botId]">["params"]) {
-  const { botId } = await params
+const loadBot = cache(async (botId: string) => {
   const id = botIdSchema.safeParse(botId)
   if (!id.success) notFound()
   const user = await requireUser()
   const bot = await findBot(user.id, id.data)
   if (!bot) notFound()
   return { user, bot }
-}
+})
 
 export async function generateMetadata({
   params,
 }: PageProps<"/teammates/[botId]">): Promise<Metadata> {
-  const { bot } = await loadBot(params)
+  const { bot } = await loadBot((await params).botId)
   return { title: `${bot.name}'s settings · Ace` }
 }
 
 export default async function TeammatePage({
   params,
 }: PageProps<"/teammates/[botId]">) {
-  const { user, bot } = await loadBot(params)
+  const { user, bot } = await loadBot((await params).botId)
   const [keys, models] = await Promise.all([
     listProviderKeys(user.id).then((rows) => rows.map(providerKeyOption)),
     modelCatalog.listAll(),

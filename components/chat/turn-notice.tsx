@@ -18,13 +18,21 @@ export function UpNextNotice({
   queue: QueueEvent
   name: string
 }) {
-  if (queue.waitingOn === "you") {
+  if (queue.waitingOn !== "work") {
+    const chat = <Link href={`/chats/${queue.chatId}`}>{queue.title}</Link>
     return (
       <Alert variant="needs-you">
         <HandPalmIcon weight="duotone" />
         <AlertDescription>
-          {name} is waiting for you to give back control in{" "}
-          <Link href={`/chats/${queue.chatId}`}>{queue.title}</Link>.
+          {queue.waitingOn === "control" ? (
+            <>
+              {name} is waiting for you to give back control in {chat}.
+            </>
+          ) : (
+            <>
+              {name} is waiting for your answer in {chat}.
+            </>
+          )}
         </AlertDescription>
       </Alert>
     )

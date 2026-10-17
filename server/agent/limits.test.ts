@@ -13,7 +13,8 @@ function turn(overrides: Partial<Parameters<typeof endReason>[0]>) {
   return {
     stopped: false,
     failed: false,
-    steps: [{ finishReason: "tool-calls" }],
+    finishReason: "tool-calls",
+    stepCount: 1,
     maxSteps: 1,
     costUsd: 0,
     taskBudgetUsd: 1,
@@ -58,7 +59,7 @@ describe("totalUsage", () => {
 
 describe("endReason", () => {
   it("is done when the model finished on its own", () => {
-    expect(endReason(turn({ steps: [{ finishReason: "stop" }] }))).toBe("done")
+    expect(endReason(turn({ finishReason: "stop" }))).toBe("done")
   })
 
   it("reports the step limit when the model wanted to keep going", () => {

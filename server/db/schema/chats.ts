@@ -2,6 +2,7 @@ import type { UIMessage } from "ai"
 import { relations } from "drizzle-orm"
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -102,11 +103,15 @@ export const turn = pgTable(
 )
 
 export const toolCallStatus = pgEnum("tool_call_status", [
+  "waiting",
   "started",
   "finished",
   "failed",
   "interrupted",
+  "denied",
 ])
+
+export const toolRisk = pgEnum("tool_risk", ["normal", "critical"])
 
 export const toolCall = pgTable(
   "tool_call",
@@ -118,12 +123,40 @@ export const toolCall = pgTable(
     toolName: text("tool_name").notNull(),
     input: jsonb("input"),
     status: toolCallStatus("status").default("started").notNull(),
+    risk: toolRisk("risk").notNull(),
     output: jsonb("output"),
     error: text("error"),
     startedAt: timestamp("started_at").defaultNow().notNull(),
     finishedAt: timestamp("finished_at"),
   },
   (table) => [primaryKey({ columns: [table.turnId, table.toolCallId] })]
+)
+
+export const approvalReason = pgEnum("approval_reason", ["policy", "critical"])
+
+export const approvalStatus = pgEnum("approval_status", [
+  "pending",
+  "approved",
+  "denied",
+])
+
+export const approval = pgTable(
+  "approval",
+  {
+    turnId: uuid("turn_id").notNull(),
+    toolCallId: text("tool_call_id").notNull(),
+    reason: approvalReason("reason").notNull(),
+    status: approvalStatus("status").default("pending").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    decidedAt: timestamp("decided_at"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.turnId, table.toolCallId] }),
+    foreignKey({
+      columns: [table.turnId, table.toolCallId],
+      foreignColumns: [toolCall.turnId, toolCall.toolCallId],
+    }).onDelete("cascade"),
+  ]
 )
 
 export const screenshot = pgTable(

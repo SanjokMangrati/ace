@@ -48,6 +48,7 @@ export default async function TeammatesPage() {
               job={bot.job}
               picture={teammatePictureUrl(bot)}
               working={bot.working}
+              needsYou={bot.needsYou}
             />
           ))}
         </div>

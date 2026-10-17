@@ -1,4 +1,4 @@
-import type { BotFormInput } from "./bot-schemas"
+import type { BotFormInput } from "@/lib/bot-schemas"
 
 export type TeammatePreset = Pick<
   BotFormInput,

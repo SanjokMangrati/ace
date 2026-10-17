@@ -1,5 +1,3 @@
-"use client"
-
 import { List, ListRow } from "@/components/ui/list"
 import { friendlyDate } from "@/lib/format"
 

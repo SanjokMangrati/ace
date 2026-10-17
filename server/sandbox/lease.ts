@@ -10,6 +10,7 @@ import type { TurnRuntime } from "@/server/ports/turn-runtime"
 
 export const LEASE_TTL_MS = 60_000
 export const TAKEOVER_TIMEOUT_SEC = 24 * 60 * 60
+export const ANSWER_TIMEOUT_SEC = 24 * 60 * 60
 const HEARTBEAT_MS = 20_000
 const WAKE_GRACE_MS = 5_000
 
@@ -101,6 +102,12 @@ export function sandboxLease({
     },
     unpark: async () => {
       await setLeaseExpiry(botId, turnId, new Date(Date.now() + LEASE_TTL_MS))
+      await wakeBotWaiters(runtime, botId)
+    },
+    hold: async (until: Date) => {
+      stopHeartbeat()
+      held = false
+      await setLeaseExpiry(botId, turnId, until)
       await wakeBotWaiters(runtime, botId)
     },
     release: async () => {

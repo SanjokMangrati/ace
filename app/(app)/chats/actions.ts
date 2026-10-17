@@ -21,7 +21,6 @@ import {
   deleteChat as deleteChatRow,
   findChatBotId,
   insertChat,
-  ownsChat,
 } from "@/server/db/queries/chats"
 import {
   findTakeover,
@@ -50,13 +49,6 @@ export async function createChat(
   redirect(`/chats/${id}`)
 }
 
-async function requireChat(chatId: string) {
-  const user = await requireUser()
-  const id = chatIdSchema.parse(chatId)
-  if (!(await ownsChat(user.id, id))) throw new Error("Chat not found")
-  return id
-}
-
 async function requireChatBot(chatId: string) {
   const user = await requireUser()
   const id = chatIdSchema.parse(chatId)
@@ -66,11 +58,11 @@ async function requireChatBot(chatId: string) {
 }
 
 export async function startChatSession(chatId: string) {
-  return chatRuntime.startSession(await requireChat(chatId))
+  return chatRuntime.startSession((await requireChatBot(chatId)).chatId)
 }
 
 export async function mintChatAccessToken(chatId: string) {
-  return chatRuntime.accessToken(await requireChat(chatId))
+  return chatRuntime.accessToken((await requireChatBot(chatId)).chatId)
 }
 
 export async function openScreen(

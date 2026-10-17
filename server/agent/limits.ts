@@ -38,16 +38,17 @@ export function sandboxCostUsd(use: SandboxUse | undefined, until: number) {
 export function endReason(turn: {
   stopped: boolean
   failed: boolean
-  steps: readonly { finishReason: string }[]
+  finishReason: string | undefined
+  stepCount: number
   maxSteps: number
   costUsd: number
   taskBudgetUsd: number
 }): TurnEndReason {
   if (turn.stopped) return "stopped"
   if (turn.failed) return "error"
-  if (turn.steps.at(-1)?.finishReason !== "tool-calls") return "done"
+  if (turn.finishReason !== "tool-calls") return "done"
   if (turn.costUsd >= turn.taskBudgetUsd) return "task_budget"
-  if (turn.steps.length >= turn.maxSteps) return "step_limit"
+  if (turn.stepCount >= turn.maxSteps) return "step_limit"
   return "done"
 }
 

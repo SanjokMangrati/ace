@@ -11,9 +11,18 @@ const db = drizzle({ client: new PGlite(), schema })
 vi.mock("server-only", () => ({}))
 vi.mock("@/server/db/client", () => ({ db }))
 
-const { endRunningTurns, loadTranscript, saveTranscript, startTurn } =
-  await import("./chats")
-const { toolCallLedger } = await import("./tool-calls")
+const {
+  endRunningTurns,
+  listChats,
+  loadTranscript,
+  pauseTurn,
+  resumeTurn,
+  saveTranscript,
+  startTurn,
+} = await import("./chats")
+const { askApproval, toolCallLedger } = await import("./tool-calls")
+
+const normal = () => "normal" as const
 
 const chatId = "00000000-0000-4000-8000-000000000001"
 let botId: string
@@ -118,7 +127,7 @@ describe("tool call ledger", () => {
   it("marks unfinished calls of a dead turn interrupted and reports them to the next turn", async () => {
     const dead = await startTurn(chatId, botId)
     expect(dead.interrupted).toEqual([])
-    const ledger = toolCallLedger(dead.id)
+    const ledger = toolCallLedger(dead.id, normal)
     await ledger.start({
       toolCallId: "a",
       toolName: "shell",
@@ -150,19 +159,19 @@ describe("tool call ledger", () => {
 
   it("reports nothing after a turn whose calls all finished", async () => {
     const done = await startTurn(chatId, botId)
-    await toolCallLedger(done.id).start({
+    await toolCallLedger(done.id, normal).start({
       toolCallId: "a",
       toolName: "shell",
       input: {},
     })
-    await toolCallLedger(done.id).finish("a", {})
+    await toolCallLedger(done.id, normal).finish("a", {})
 
     expect((await startTurn(chatId, botId)).interrupted).toEqual([])
   })
 
   it("marks unfinished calls interrupted when a failed run ends its turns", async () => {
     const dead = await startTurn(chatId, botId)
-    await toolCallLedger(dead.id).start({
+    await toolCallLedger(dead.id, normal).start({
       toolCallId: "a",
       toolName: "shell",
       input: {},
@@ -173,5 +182,78 @@ describe("tool call ledger", () => {
     expect((await startTurn(chatId, botId)).interrupted).toEqual([
       { toolName: "shell", input: {}, status: "interrupted" },
     ])
+  })
+})
+
+describe("approvals", () => {
+  async function ask(turnId: string, toolCallId: string) {
+    await askApproval(turnId, {
+      toolCallId,
+      toolName: "shell",
+      input: { command: "git push" },
+      risk: "normal",
+      reason: "policy",
+    })
+  }
+
+  async function status() {
+    const [row] = await listChats("user-1")
+    return { working: row.working, needsYou: row.needsYou }
+  }
+
+  it("keeps a waiting turn open, shows it as needing you, and resumes it with the answers", async () => {
+    const waiting = await startTurn(chatId, botId)
+    await ask(waiting.id, "a")
+    await ask(waiting.id, "b")
+    await pauseTurn(waiting.id, {
+      stepCount: 3,
+      inputTokens: 10,
+      outputTokens: 5,
+      costUsd: 0.5,
+    })
+    expect(await status()).toEqual({ working: false, needsYou: true })
+
+    const resumed = await resumeTurn(chatId, [
+      { toolCallId: "a", approved: true },
+      { toolCallId: "b", approved: false },
+    ])
+
+    expect(resumed?.id).toBe(waiting.id)
+    expect(resumed?.totals).toEqual({
+      stepCount: 3,
+      inputTokens: 10,
+      outputTokens: 5,
+      costUsd: 0.5,
+    })
+    expect(
+      resumed?.decided.map(({ toolCallId, approved }) => [toolCallId, approved])
+    ).toEqual([
+      ["a", true],
+      ["b", false],
+    ])
+    expect(await status()).toEqual({ working: true, needsYou: false })
+
+    const ledger = toolCallLedger(waiting.id, () => undefined)
+    await ledger.start({ toolCallId: "a", toolName: "shell", input: {} })
+    await expect(
+      ledger.start({ toolCallId: "a", toolName: "shell", input: {} })
+    ).rejects.toThrow("already ran")
+    await expect(
+      ledger.start({ toolCallId: "b", toolName: "shell", input: {} })
+    ).rejects.toThrow("already ran")
+  })
+
+  it("doesn't resume a turn for answers it never asked for or already has", async () => {
+    const waiting = await startTurn(chatId, botId)
+    await ask(waiting.id, "a")
+    expect(
+      await resumeTurn(chatId, [{ toolCallId: "z", approved: true }])
+    ).toBeNull()
+    expect(
+      await resumeTurn(chatId, [{ toolCallId: "a", approved: true }])
+    ).not.toBeNull()
+    expect(
+      await resumeTurn(chatId, [{ toolCallId: "a", approved: true }])
+    ).toBeNull()
   })
 })
