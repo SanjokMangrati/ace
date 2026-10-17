@@ -1,5 +1,5 @@
 import { chat } from "@trigger.dev/sdk/ai"
-import { isStepCount, type ModelMessage } from "ai"
+import type { ModelMessage, ToolSet } from "ai"
 import { TEAMMATE_CHAT_TASK, type TeammateMessage } from "@/lib/chat"
 import { providerLabel } from "@/lib/models"
 import { createAiGatewayCatalog } from "@/server/adapters/ai-gateway"
@@ -8,6 +8,7 @@ import { createDaytonaSandboxes } from "@/server/adapters/daytona"
 import { createEnvKeyVault } from "@/server/adapters/env-key-vault"
 import { postgresTranscriptStorage } from "@/server/adapters/trigger/transcript-storage"
 import { triggerTurnRuntime } from "@/server/adapters/trigger/turn-runtime"
+import { approvalAnswers, approvalGate } from "@/server/agent/approvals"
 import {
   computerExecutor,
   computerModelOutput,
@@ -30,14 +31,18 @@ import {
 } from "@/server/agent/limits"
 import { noteTools } from "@/server/agent/notes"
 import { systemPrompt } from "@/server/agent/prompt"
+import { judgeRisk, type ToolRisk } from "@/server/agent/risk"
 import { sandboxTools } from "@/server/agent/sandbox-tools"
 import {
   endRunningTurns,
   findChatContext,
   finishTurn,
+  pauseTurn,
+  resumeTurn,
   spentSince,
   startTurn,
   type TurnEndReason,
+  type TurnTotals,
 } from "@/server/db/queries/chats"
 import {
   endTakeover,
@@ -45,11 +50,12 @@ import {
   saveSandbox,
 } from "@/server/db/queries/sandboxes"
 import { loadScreenshot, saveScreenshot } from "@/server/db/queries/screenshots"
-import { toolCallLedger } from "@/server/db/queries/tool-calls"
+import { askApproval, toolCallLedger } from "@/server/db/queries/tool-calls"
 import { env } from "@/server/env"
 import type { ComputerHandlers } from "@/server/ports/computer"
 import type { Sandbox } from "@/server/ports/sandbox"
 import {
+  ANSWER_TIMEOUT_SEC,
   LEASE_TTL_MS,
   releaseTurnLease,
   type SandboxLease,
@@ -66,8 +72,19 @@ const runtime = triggerTurnRuntime
 const HANDED_BACK =
   "The person took control of your screen and has now given it back. They may have changed what's on it, so look at the screen again before you go on."
 
+const NO_TOTALS: TurnTotals = {
+  stepCount: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  costUsd: 0,
+}
+
 type Turn = {
   id: string
+  base: TurnTotals
+  judgeUsd: number
+  risks: Map<string, ToolRisk>
+  asking: boolean
   botId: string
   price: Price | undefined
   maxSteps: number
@@ -96,6 +113,8 @@ function currentTurn() {
 
 function turnCostUsd(current: Turn, steps: Turn["steps"]) {
   return (
+    current.base.costUsd +
+    current.judgeUsd +
     costUsd(current.price, totalUsage(steps)) +
     sandboxCostUsd(current.sandboxUse, Date.now())
   )
@@ -169,14 +188,18 @@ async function handBackMessage(
   }
 }
 
+function stamp(started: "createdAt" | "resumedAt") {
+  return ({ part }: { part: { type: string } }) => {
+    if (part.type === "start") return { [started]: Date.now() }
+    if (part.type === "finish") return { finishedAt: Date.now() }
+  }
+}
+
 export const teammateChat = chat
   .withUIMessage<TeammateMessage>({
     streamOptions: {
       sendReasoning: true,
-      messageMetadata: ({ part }) => {
-        if (part.type === "start") return { createdAt: Date.now() }
-        if (part.type === "finish") return { finishedAt: Date.now() }
-      },
+      messageMetadata: stamp("createdAt"),
     },
   })
   .agent({
@@ -208,10 +231,19 @@ export const teammateChat = chat
 
       const model = await modelCatalog.find(key.provider, bot.modelId)
       const canSeeScreen = model?.vision ?? false
-      const { id: turnId, interrupted } = await startTurn(chatId, bot.id)
+      const answers = approvalAnswers(messages)
+      const resumed =
+        answers.length > 0 ? await resumeTurn(chatId, answers) : null
+      const { id: turnId, interrupted } = resumed
+        ? { id: resumed.id, interrupted: [] }
+        : await startTurn(chatId, bot.id)
       const queueId = `queue-${turnId}`
       const current: Turn = {
         id: turnId,
+        base: resumed?.totals ?? NO_TOTALS,
+        judgeUsd: 0,
+        risks: new Map(),
+        asking: false,
         botId: bot.id,
         price: model,
         maxSteps: bot.maxSteps,
@@ -236,10 +268,12 @@ export const teammateChat = chat
       }
       turn.current = current
 
-      const spent = await spentSince(bot.id, new Date(Date.now() - DAY_MS))
-      if (spent >= bot.dailyBudgetUsd) {
-        current.reason = "daily_budget"
-        return
+      if (!resumed) {
+        const spent = await spentSince(bot.id, new Date(Date.now() - DAY_MS))
+        if (spent >= bot.dailyBudgetUsd) {
+          current.reason = "daily_budget"
+          return
+        }
       }
 
       const { computer: genericComputer, ...withoutScreen } = tools
@@ -255,26 +289,42 @@ export const teammateChat = chat
           toModelOutput: historyComputer.toModelOutput,
         }
       }
-      const screenTools = current.computer && {
-        computer:
-          models.nativeComputerTool(
-            key.provider,
-            bot.modelId,
-            current.computer
-          ) ?? genericComputer,
+      const turnTools: ToolSet = current.computer
+        ? {
+            ...withoutScreen,
+            computer:
+              models.nativeComputerTool(
+                key.provider,
+                bot.modelId,
+                current.computer
+              ) ?? genericComputer,
+          }
+        : withoutScreen
+
+      const credentials = {
+        provider: key.provider,
+        baseUrl: key.baseUrl,
+        apiKey: key.sealedKey ? keyVault.open(key.sealedKey) : undefined,
       }
+      const judgeModelId = key.judgeModelId ?? bot.modelId
+      const judgeModel = models.languageModel(credentials, judgeModelId)
+      const judgePrice =
+        judgeModelId === bot.modelId
+          ? model
+          : await modelCatalog.find(key.provider, judgeModelId)
+      const decided = resumed?.decided ?? []
+      const unshownAnswers = decided.map(({ toolCallId, at }) => ({
+        toolCallId,
+        at,
+      }))
 
       const handBacks: HandBack[] = []
-      chat.setUIMessageStreamOptions({ onError: () => current.failure })
+      chat.setUIMessageStreamOptions({
+        onError: () => current.failure,
+        ...(resumed && { messageMetadata: stamp("resumedAt") }),
+      })
       return streamText({
-        model: models.languageModel(
-          {
-            provider: key.provider,
-            baseUrl: key.baseUrl,
-            apiKey: key.sealedKey ? keyVault.open(key.sealedKey) : undefined,
-          },
-          bot.modelId
-        ),
+        model: models.languageModel(credentials, bot.modelId),
         system: systemPrompt({ ...bot, canSeeScreen }),
         messages: interrupted.length
           ? [
@@ -283,15 +333,57 @@ export const teammateChat = chat
             ]
           : messages,
         tools: withLedger(
-          { ...withoutScreen, ...screenTools },
-          toolCallLedger(turnId)
+          turnTools,
+          toolCallLedger(turnId, (toolCallId) => current.risks.get(toolCallId))
         ),
+        toolApproval: approvalGate({
+          fullAuto: bot.fullAuto,
+          askBefore: bot.askBefore,
+          judge: async (call, seen) => {
+            const verdict = await judgeRisk({
+              model: judgeModel,
+              call,
+              messages: seen,
+              abortSignal: signal,
+            })
+            current.judgeUsd += costUsd(judgePrice, verdict.usage)
+            return verdict
+          },
+          answered: new Set(answers.map((answer) => answer.toolCallId)),
+          approved: new Set(
+            decided
+              .filter((answer) => answer.approved)
+              .map((answer) => answer.toolCallId)
+          ),
+          onResume: () => current.lease.ensure(),
+          onAssessed: async ({ toolCallId, toolName, input }, assessment) => {
+            if (!assessment.ask) {
+              current.risks.set(toolCallId, assessment.risk)
+              return
+            }
+            await askApproval(turnId, {
+              toolCallId,
+              toolName,
+              input,
+              risk: assessment.risk,
+              reason: assessment.ask,
+            })
+            current.asking = true
+          },
+        }),
         abortSignal: signal,
         stopWhen: [
-          isStepCount(bot.maxSteps),
+          ({ steps }) => current.base.stepCount + steps.length >= bot.maxSteps,
           ({ steps }) => turnCostUsd(current, steps) >= bot.taskBudgetUsd,
         ],
         prepareStep: async ({ initialMessages, responseMessages }) => {
+          for (const answer of unshownAnswers.splice(0)) {
+            runtime.write({
+              type: "data-answer",
+              id: `answer-${answer.toolCallId}`,
+              data: answer,
+            })
+          }
           await current.lease.ensure()
           if (await waitForTakeover(current)) {
             handBacks.push({
@@ -323,29 +415,35 @@ export const teammateChat = chat
       turn.current = null
 
       const usage = totalUsage(current.steps)
-      const cost = turnCostUsd(current, current.steps)
+      const totals: TurnTotals = {
+        stepCount: current.base.stepCount + current.steps.length,
+        inputTokens: current.base.inputTokens + usage.inputTokens,
+        outputTokens: current.base.outputTokens + usage.outputTokens,
+        costUsd: turnCostUsd(current, current.steps),
+      }
+      if (current.asking && !stopped && !current.failed) {
+        await pauseTurn(current.id, totals)
+        await current.lease.hold(
+          new Date(Date.now() + ANSWER_TIMEOUT_SEC * 1000 + LEASE_TTL_MS)
+        )
+        return
+      }
+
       const reason =
         current.reason ??
         endReason({
           stopped,
           failed: current.failed,
-          steps: current.steps,
+          finishReason: current.steps.at(-1)?.finishReason,
+          stepCount: totals.stepCount,
           maxSteps: current.maxSteps,
-          costUsd: cost,
+          costUsd: totals.costUsd,
           taskBudgetUsd: current.taskBudgetUsd,
         })
-      const notice = turnNotice(reason, {
-        ...current,
-        steps: current.steps.length,
-      })
+      const notice = turnNotice(reason, { ...current, steps: totals.stepCount })
       if (notice) writer.write({ type: "data-notice", data: notice })
 
-      await finishTurn(current.id, {
-        endReason: reason,
-        stepCount: current.steps.length,
-        ...usage,
-        costUsd: cost,
-      })
+      await finishTurn(current.id, { endReason: reason, ...totals })
       await current.lease.release()
     },
   })

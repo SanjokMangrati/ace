@@ -178,69 +178,76 @@ function StepIcon({ step }: { step: Step }) {
   )
 }
 
-function Screenshot({
+const marks = { working: "stroke-working", "needs-you": "stroke-needs-you" }
+
+export function Screenshot({
   shot,
   at,
+  mark = "working",
+  className,
 }: {
   shot: Shot
   at: { x: number; y: number } | undefined
+  mark?: keyof typeof marks
+  className?: string
 }) {
   return (
-    <div className="pl-9">
-      <svg
-        viewBox={`0 0 ${shot.width} ${shot.height}`}
-        aria-hidden
-        className="block w-50 max-w-full rounded-sm bg-screen shadow-card"
-      >
-        <image
-          href={`/api/screenshots/${shot.id}`}
-          width={shot.width}
-          height={shot.height}
+    <svg
+      viewBox={`0 0 ${shot.width} ${shot.height}`}
+      aria-hidden
+      className={cn(
+        "block max-w-full rounded-sm bg-screen shadow-card",
+        className
+      )}
+    >
+      <image
+        href={`/api/screenshots/${shot.id}`}
+        width={shot.width}
+        height={shot.height}
+      />
+      {at && (
+        <circle
+          cx={at.x}
+          cy={at.y}
+          r={36}
+          strokeWidth={7}
+          className={cn("fill-none", marks[mark])}
         />
-        {at && (
-          <circle
-            cx={at.x}
-            cy={at.y}
-            r={36}
-            strokeWidth={7}
-            className="fill-none stroke-working"
-          />
-        )}
-      </svg>
-    </div>
+      )}
+    </svg>
   )
 }
 
-function CommandDetails({
-  command,
-  output,
+export function ShowDetails({
+  details,
+  className,
 }: {
-  command: string
-  output: string | undefined
+  details: string
+  className?: string
 }) {
   const detailsId = useId()
   const [open, setOpen] = useState(false)
 
   return (
-    <>
+    <div className={cn("flex flex-col", className)}>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={detailsId}
         onClick={() => setOpen((value) => !value)}
-        className="ml-9 cursor-pointer self-start text-caption text-ink-3 underline decoration-line-strong underline-offset-3 hover:decoration-current"
+        className="cursor-pointer self-start text-ink-3 underline decoration-line-strong underline-offset-3 hover:decoration-current"
       >
         {open ? "Hide details" : "Show details"}
       </button>
       {open && (
         <div
           id={detailsId}
-          className="mt-1.5 ml-9 max-h-45 overflow-auto rounded-sm bg-fill px-3 py-2.5 font-mono text-code whitespace-pre text-ink-2"
+          className="mt-1.5 max-h-45 overflow-auto rounded-sm bg-fill px-3 py-2.5 font-mono text-code whitespace-pre text-ink-2"
         >
-          {[`$ ${command}`, output].filter(Boolean).join("\n")}
+          {details}
         </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -318,6 +325,7 @@ export function Activity({
               </div>
               {step.kind === "screen" && step.shot && (
                 <Screenshot
+                  className="ml-9 w-50"
                   shot={step.shot}
                   at={step.verb === "click" ? step.at : undefined}
                 />
@@ -325,7 +333,12 @@ export function Activity({
               {step.kind === "command" &&
                 step.command &&
                 step.state !== "running" && (
-                  <CommandDetails command={step.command} output={step.output} />
+                  <ShowDetails
+                    className="ml-9 text-caption"
+                    details={[`$ ${step.command}`, step.output]
+                      .filter(Boolean)
+                      .join("\n")}
+                  />
                 )}
             </li>
           ))}

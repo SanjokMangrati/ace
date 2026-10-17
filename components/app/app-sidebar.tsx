@@ -42,7 +42,7 @@ import { chatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { AuthUser } from "@/server/ports/auth"
 import { DeleteChatDialog } from "./delete-chat"
-import { useLiveChat } from "./live-chat"
+import { type LiveStatus, useLiveChat } from "./live-chat"
 
 export type SidebarChat = {
   id: string
@@ -50,6 +50,7 @@ export type SidebarChat = {
   updatedAt: Date
   working: boolean
   queued: boolean
+  needsYou: boolean
   inControl: boolean
   teammate: { id: string; name: string; picture: string | null }
 }
@@ -101,8 +102,6 @@ function YouAvatar({ user }: { user: AuthUser }) {
   )
 }
 
-type LiveStatus = { working: boolean; queued: boolean }
-
 function liveStatus(chat: SidebarChat, live: ReturnType<typeof useLiveChat>) {
   return live?.id === chat.id ? live : chat
 }
@@ -114,6 +113,14 @@ function ChatStatus({
   chat: SidebarChat
   status: LiveStatus
 }) {
+  if (status.needsYou) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-caption font-medium text-needs-you">
+        <StatusDot tone="needs-you" className="size-1.75" />
+        Needs you
+      </span>
+    )
+  }
   if (chat.inControl) {
     return (
       <span className="inline-flex items-center gap-1.5 text-caption font-medium text-control">

@@ -19,6 +19,7 @@ export default async function AppLayout({ children, modal }: LayoutProps<"/">) {
         updatedAt: chat.updatedAt,
         working: chat.working,
         queued: chat.queued,
+        needsYou: chat.needsYou,
         inControl: chat.inControl,
         teammate: {
           id: chat.bot.id,

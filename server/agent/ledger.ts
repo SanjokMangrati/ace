@@ -1,5 +1,6 @@
 import type { ToolExecutionOptions, ToolSet } from "ai"
 import { truncateMiddle } from "@/server/agent/sandbox-tools"
+import type { toolCallStatus } from "@/server/db/schema"
 
 const INPUT_LIMIT_CHARS = 300
 
@@ -16,7 +17,7 @@ export type ToolCallLedger = {
 type LedgerCall = {
   toolName: string
   input: unknown
-  status: "started" | "finished" | "failed" | "interrupted"
+  status: (typeof toolCallStatus.enumValues)[number]
 }
 
 export function withLedger<TOOLS extends ToolSet>(
@@ -60,6 +61,8 @@ const OUTCOMES: Record<LedgerCall["status"], string> = {
   interrupted: "cut off, it may or may not have happened",
   finished: "finished",
   failed: "failed",
+  waiting: "waited for the person's answer and didn't run",
+  denied: "the person didn't allow it, so it didn't run",
 }
 
 export function interruptedNote(calls: LedgerCall[]) {

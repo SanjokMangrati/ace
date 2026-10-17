@@ -46,6 +46,7 @@ export default async function ChatPage({
         name: chat.bot.name,
         picture: teammatePictureUrl(chat.bot),
         connected: chat.bot.connected,
+        fullAuto: chat.bot.fullAuto,
       }}
       initialMessages={chat.messages}
       session={session}

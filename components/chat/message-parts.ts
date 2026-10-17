@@ -1,3 +1,4 @@
+import { isToolUIPart } from "ai"
 import type { QueueEvent, TeammateMessage, TurnNotice } from "@/lib/chat"
 
 type Part = TeammateMessage["parts"][number]
@@ -17,6 +18,7 @@ export type Step = { key: string; state: StepState } & (
       kind: "screen"
       verb: ScreenVerb
       intent?: string
+      text?: string
       shot?: Shot
       at?: { x: number; y: number }
     }
@@ -60,6 +62,14 @@ function screenStep(part: ComputerPart): Step {
     state: toolState(part.state),
     verb: screenVerbs[generic?.type ?? String(action)] ?? "look",
     intent: input && "intent" in input ? input.intent : undefined,
+    text:
+      generic && "text" in generic
+        ? generic.text
+        : generic && "keys" in generic
+          ? generic.keys
+          : input && "text" in input
+            ? input.text
+            : undefined,
     shot:
       part.state === "output-available" ? part.output.screenshot : undefined,
     at: typeof x === "number" && typeof y === "number" ? { x, y } : undefined,
@@ -151,29 +161,99 @@ function stepOf(part: Part, index: number): Step | null {
   }
 }
 
+export type Ask = {
+  step: Step
+  approvalId: string
+  careful?: string
+  answer: "pending" | "allowed" | "denied"
+  answeredAt?: number
+  shot?: Shot
+}
+
+export type Segment = { steps: Step[]; text: string; asks: Ask[] }
+
+type Draft = { steps: Step[]; texts: string[]; asks: Ask[] }
+
+const PARAGRAPH = "\n\n"
+
+function draft(): Draft {
+  return { steps: [], texts: [], asks: [] }
+}
+
+function approvalOf(
+  part: Part
+): Pick<Ask, "approvalId" | "careful" | "answer"> | null {
+  if (!isToolUIPart(part) || !part.approval || part.approval.isAutomatic) {
+    return null
+  }
+  return {
+    approvalId: part.approval.id,
+    careful: part.approval.requestReason,
+    answer:
+      part.state === "approval-requested"
+        ? "pending"
+        : part.approval.approved
+          ? "allowed"
+          : "denied",
+  }
+}
+
 export function readMessage(message: TeammateMessage) {
-  const steps: Step[] = []
-  const texts: string[] = []
   const notices: TurnNotice[] = []
   let queue: QueueEvent | undefined
-
-  for (const [index, part] of message.parts.entries()) {
-    if (part.type === "text") {
-      if (part.text.trim()) texts.push(part.text)
-    } else if (part.type === "data-notice") {
-      notices.push(part.data)
-    } else if (part.type === "data-queue") {
-      queue = part.data
-    } else {
-      const step = stepOf(part, index)
-      const last = steps.at(-1)
-      if (step?.kind === "think" && last?.kind === "think") {
-        steps[steps.length - 1] = step
-      } else if (step) {
-        steps.push(step)
-      }
+  const answeredAt = new Map<string, number>()
+  for (const part of message.parts) {
+    if (part.type === "data-answer") {
+      answeredAt.set(part.data.toolCallId, part.data.at)
     }
   }
 
-  return { steps, text: texts.join("\n\n"), notices, queue }
+  const drafts: Draft[] = [draft()]
+  let current = drafts[0]
+  let shot: Shot | undefined
+
+  for (const [index, part] of message.parts.entries()) {
+    if (part.type === "text") {
+      if (part.text.trim()) current.texts.push(part.text)
+      continue
+    }
+    if (part.type === "data-notice") {
+      notices.push(part.data)
+      continue
+    }
+    if (part.type === "data-queue") {
+      queue = part.data
+      continue
+    }
+    const step = stepOf(part, index)
+    if (!step) continue
+    const approval = approvalOf(part)
+    if (approval) {
+      current.asks.push({
+        ...approval,
+        step,
+        answeredAt: answeredAt.get(step.key),
+        shot,
+      })
+      current = draft()
+      drafts.push(current)
+      if (approval.answer !== "allowed") continue
+    }
+    if (step.kind === "screen" && step.shot) shot = step.shot
+    const last = current.steps.at(-1)
+    if (step.kind === "think" && last?.kind === "think") {
+      current.steps[current.steps.length - 1] = step
+    } else {
+      current.steps.push(step)
+    }
+  }
+
+  const segments = drafts.map(
+    ({ steps, texts, asks }): Segment => ({
+      steps,
+      text: texts.join(PARAGRAPH),
+      asks,
+    })
+  )
+  return { segments, notices, queue }
 }

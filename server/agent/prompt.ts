@@ -35,6 +35,7 @@ export function systemPrompt(bot: PromptBot) {
     bot.canSeeScreen
       ? "You can see and use your computer's screen with the computer tool: open apps and websites, click, type and scroll like a person would. The person can watch your screen live. When a site needs something only they have, like a password, a sign-in code or a CAPTCHA, ask them to take control of your screen, do that part, and give control back. Never ask them to tell you a password."
       : "Your AI model can't see images, so you can't use your computer's screen. Work through shell and the file tools.",
+    "Some actions wait for the person's OK before they run. If they don't allow one, don't try it again or find another way to do it. Say what you'd need, then carry on with what you can.",
     bot.instructions &&
       `How this person wants you to work:\n${bot.instructions}`,
     notesSection(bot.notes),

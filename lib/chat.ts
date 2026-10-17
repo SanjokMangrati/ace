@@ -17,12 +17,15 @@ export type ControlEvent = { tookAt: number; gaveAt?: number }
 export type QueueEvent = {
   chatId: string
   title: string
-  waitingOn: "work" | "you"
+  waitingOn: "work" | "control" | "answer"
   startedAt?: number
 }
 
+type AnswerEvent = { toolCallId: string; at: number }
+
 type MessageMetadata = {
   createdAt?: number
+  resumedAt?: number
   finishedAt?: number
   control?: ControlEvent
 }
@@ -39,7 +42,12 @@ type ComputerUITool = {
 
 export type TeammateMessage = UIMessage<
   MessageMetadata,
-  { notice: TurnNotice; control: ControlEvent; queue: QueueEvent },
+  {
+    notice: TurnNotice
+    control: ControlEvent
+    queue: QueueEvent
+    answer: AnswerEvent
+  },
   InferUITools<NoteTools & SandboxTools> & { computer: ComputerUITool }
 >
 

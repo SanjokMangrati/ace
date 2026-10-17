@@ -19,7 +19,7 @@ import { TeammateAvatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Status } from "@/components/ui/status"
-import { useAction } from "@/lib/action-client"
+import { callAction, useAction } from "@/lib/action-client"
 import type { ControlEvent } from "@/lib/chat"
 import { cn } from "@/lib/utils"
 import { SCREEN } from "@/server/ports/computer"
@@ -63,10 +63,9 @@ function LiveScreen({
   )
   useEffect(() => {
     let active = true
-    openScreen(chatId).then(
-      ({ url }) => active && setScreen({ url }),
-      () => active && setScreen("failed")
-    )
+    callAction(() => openScreen(chatId)).then((result) => {
+      if (active) setScreen(result.ok ? { url: result.url } : "failed")
+    })
     return () => {
       active = false
     }

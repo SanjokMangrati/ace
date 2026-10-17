@@ -42,6 +42,16 @@ export const DEFAULT_ASK_BEFORE: Record<ToolGroup, boolean> = {
   handoff: false,
 }
 
+export function askBeforeFrom(
+  policies: readonly { tool: ToolGroup; requiresApproval: boolean }[]
+) {
+  const askBefore = { ...DEFAULT_ASK_BEFORE }
+  for (const policy of policies) {
+    askBefore[policy.tool] = policy.requiresApproval
+  }
+  return askBefore
+}
+
 function budget(label: string) {
   return z
     .number({ error: `Enter an amount for ${label}, like 1.00.` })

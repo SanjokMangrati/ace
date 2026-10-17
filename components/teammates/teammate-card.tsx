@@ -9,12 +9,14 @@ export function TeammateCard({
   job,
   picture,
   working,
+  needsYou,
 }: {
   id: string
   name: string
   job: string
   picture: string | null
   working: boolean
+  needsYou: boolean
 }) {
   const href = `/teammates/${id}`
 
@@ -35,7 +37,13 @@ export function TeammateCard({
         </div>
       </div>
       <div className="flex min-h-control-sm items-center justify-between gap-2">
-        {working ? <Status tone="working">Working</Status> : <span />}
+        {needsYou ? (
+          <Status tone="needs-you">Needs you</Status>
+        ) : working ? (
+          <Status tone="working">Working</Status>
+        ) : (
+          <span />
+        )}
         <div className="flex gap-2">
           <Link
             href={href}

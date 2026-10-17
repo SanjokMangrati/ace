@@ -157,7 +157,7 @@ describe("sandboxLease", () => {
       .where(eq(schema.sandbox.botId, botId))
     await first.lease.park(new Date(Date.now() + 60 * 60_000))
     await vi.waitFor(() => expect(second.queued).toHaveLength(2))
-    expect(second.queued[1].waitingOn).toBe("you")
+    expect(second.queued[1].waitingOn).toBe("control")
     expect(runtime.timeouts.at(-1)).toBeGreaterThan(60 * 60)
 
     await db

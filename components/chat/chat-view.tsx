@@ -7,6 +7,10 @@ import {
   InfoIcon,
   MonitorIcon,
 } from "@phosphor-icons/react/ssr"
+import {
+  isToolUIPart,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+} from "ai"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -118,24 +122,27 @@ export function ChatView({
   const [resume] = useState(initialMessages.length > 0)
   const [failures, setFailures] = useState<Record<string, string>>({})
   const lastFailure = useRef(SOMETHING_WENT_WRONG)
-  const { messages, sendMessage, status, error } = useChat<TeammateMessage>({
-    id: chatId,
-    messages: initialMessages,
-    transport,
-    resume,
-    onError: (failure) => {
-      lastFailure.current = failure.message || SOMETHING_WENT_WRONG
-    },
-    onFinish: ({ message, isError }) => {
-      if (isError && message.role === "assistant") {
-        setFailures((current) => ({
-          ...current,
-          [message.id]: lastFailure.current,
-        }))
-      }
-      router.refresh()
-    },
-  })
+  const { messages, sendMessage, status, error, addToolApprovalResponse } =
+    useChat<TeammateMessage>({
+      id: chatId,
+      messages: initialMessages,
+      transport,
+      resume,
+      sendAutomaticallyWhen:
+        lastAssistantMessageIsCompleteWithApprovalResponses,
+      onError: (failure) => {
+        lastFailure.current = failure.message || SOMETHING_WENT_WRONG
+      },
+      onFinish: ({ message, isError }) => {
+        if (isError && message.role === "assistant") {
+          setFailures((current) => ({
+            ...current,
+            [message.id]: lastFailure.current,
+          }))
+        }
+        router.refresh()
+      },
+    })
   const [draft, setDraft] = useState("")
   const [screenOpen, setScreenOpen] = useState(inControl)
   const [fullSize, setFullSize] = useState(false)
@@ -148,8 +155,17 @@ export function ChatView({
     last.parts.some(
       (part) => part.type === "data-queue" && part.data.startedAt === undefined
     )
-  const canSend = teammate.connected && !working && !inControl
-  useReportLiveChat(chatId, working, queued)
+  const needsYou =
+    !working &&
+    last?.role === "assistant" &&
+    last.parts.some(
+      (part) =>
+        isToolUIPart(part) &&
+        part.state === "approval-requested" &&
+        !part.approval.isAutomatic
+    )
+  const canSend = teammate.connected && !working && !inControl && !needsYou
+  useReportLiveChat(chatId, { working, queued, needsYou })
 
   function send(text: string) {
     sendMessage({ text, metadata: { createdAt: Date.now() } })
@@ -203,6 +219,12 @@ export function ChatView({
                 onKeepGoing={
                   index === messages.length - 1 && canSend
                     ? () => send("Keep going")
+                    : undefined
+                }
+                onAnswer={
+                  index === messages.length - 1 && needsYou
+                    ? (id, approved) =>
+                        addToolApprovalResponse({ id, approved })
                     : undefined
                 }
               />
@@ -266,6 +288,8 @@ export function ChatView({
                       <HandPalmIcon weight="duotone" />
                       {teammate.name} is paused while you're in control
                     </>
+                  ) : needsYou ? (
+                    `${teammate.name} is waiting for your answer above`
                   ) : (
                     working &&
                     `${teammate.name} is working on this. You can reply when it's done.`
@@ -311,7 +335,9 @@ export function ChatView({
           <h1 className="truncate font-display text-title">{title}</h1>
           <span className="text-caption text-ink-3">with {teammate.name}</span>
         </div>
-        {inControl ? (
+        {needsYou ? (
+          <Status tone="needs-you">Needs you</Status>
+        ) : inControl ? (
           <Status tone="control">You're in control</Status>
         ) : queued ? (
           <Status tone="waiting">Up next</Status>

@@ -1,12 +1,23 @@
 import "server-only"
-import { and, asc, desc, eq, exists, isNotNull, isNull, sql } from "drizzle-orm"
 import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  isNotNull,
+  isNull,
+  not,
+  sql,
+} from "drizzle-orm"
+import {
+  askBeforeFrom,
   type BotFormInput,
-  DEFAULT_ASK_BEFORE,
   TOOL_GROUPS,
   type ToolGroup,
 } from "@/lib/bot-schemas"
 import { type Db, db } from "@/server/db/client"
+import { awaitsAnswer } from "@/server/db/queries/chats"
 import {
   insertProviderKey,
   type NewProviderKey,
@@ -31,6 +42,8 @@ async function resolveKeyId(
 
 const hasPicture = isNotNull(bot.picture)
 
+const openTurn = and(eq(turn.botId, bot.id), isNull(turn.endedAt))
+
 export async function listBots(userId: string) {
   return db
     .select({
@@ -43,7 +56,10 @@ export async function listBots(userId: string) {
         db
           .select({ id: turn.id })
           .from(turn)
-          .where(and(eq(turn.botId, bot.id), isNull(turn.endedAt)))
+          .where(and(openTurn, not(awaitsAnswer)))
+      )}`,
+      needsYou: sql<boolean>`${exists(
+        db.select({ id: turn.id }).from(turn).where(and(openTurn, awaitsAnswer))
       )}`,
     })
     .from(bot)
@@ -82,11 +98,7 @@ export async function findBot(userId: string, id: string) {
   })
   if (!row) return null
   const { toolPolicies, ...rest } = row
-  const askBefore = { ...DEFAULT_ASK_BEFORE }
-  for (const policy of toolPolicies) {
-    askBefore[policy.tool] = policy.requiresApproval
-  }
-  return { ...rest, askBefore }
+  return { ...rest, askBefore: askBeforeFrom(toolPolicies) }
 }
 
 export async function findBotPicture(userId: string, id: string) {

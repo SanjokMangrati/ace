@@ -4,6 +4,7 @@ import {
   ArrowCounterClockwiseIcon,
   HandPalmIcon,
 } from "@phosphor-icons/react/ssr"
+import { Fragment } from "react"
 import {
   Message,
   MessageContent,
@@ -11,9 +12,10 @@ import {
 } from "@/components/ai-elements/message"
 import { TeammateAvatar } from "@/components/ui/avatar"
 import type { TeammateMessage } from "@/lib/chat"
-import { clockTime } from "@/lib/format"
 import { Activity } from "./activity"
-import { readMessage } from "./message-parts"
+import { readMessage, type Segment } from "./message-parts"
+import { PermissionCard } from "./permission-card"
+import { Time } from "./time"
 import { TurnNotice, UpNextNotice } from "./turn-notice"
 
 export type ChatTeammate = {
@@ -21,21 +23,10 @@ export type ChatTeammate = {
   name: string
   picture: string | null
   connected: boolean
+  fullAuto: boolean
 }
 
-function Time({ at, className }: { at?: number; className?: string }) {
-  if (at === undefined) return null
-  const date = new Date(at)
-  return (
-    <time
-      dateTime={date.toISOString()}
-      suppressHydrationWarning
-      className={className}
-    >
-      {clockTime(date)}
-    </time>
-  )
-}
+const EMPTY: Segment = { steps: [], text: "", asks: [] }
 
 function ControlEvents({
   teammateName,
@@ -111,22 +102,27 @@ export function TeammateReply({
   working,
   error,
   onKeepGoing,
+  onAnswer,
 }: {
   teammate: ChatTeammate
   message: TeammateMessage | undefined
   working: boolean
   error?: string
   onKeepGoing?: () => void
+  onAnswer?: (approvalId: string, approved: boolean) => void
 }) {
-  const { steps, text, notices, queue } = message
+  const { segments, notices, queue } = message
     ? readMessage(message)
-    : { steps: [], text: "", notices: [], queue: undefined }
+    : { segments: [EMPTY], notices: [], queue: undefined }
   const upNext = working && queue?.startedAt === undefined ? queue : undefined
   if (error && !notices.some((notice) => notice.reason === "error")) {
     notices.push({ reason: "error", message: error })
   }
   const createdAt = message?.metadata?.createdAt
+  const startedAt =
+    segments.length > 1 ? message?.metadata?.resumedAt : createdAt
   const finishedAt = message?.metadata?.finishedAt
+  const settingsHref = `/teammates/${teammate.id}`
 
   return (
     <Message from="assistant">
@@ -141,26 +137,49 @@ export function TeammateReply({
           <Time at={createdAt} className="text-caption text-ink-3" />
         </div>
         {upNext && <UpNextNotice queue={upNext} name={teammate.name} />}
-        {!upNext && (working || steps.length > 0) && (
-          <Activity
-            steps={steps}
-            working={working}
-            durationMs={
-              createdAt !== undefined && finishedAt !== undefined
-                ? finishedAt - createdAt
-                : undefined
-            }
-          />
-        )}
-        {text && (
-          <MessageResponse isAnimating={working}>{text}</MessageResponse>
-        )}
+        {segments.map((segment, index) => {
+          const last = index === segments.length - 1
+          const busy = last && working
+          return (
+            <Fragment key={segment.asks.at(-1)?.step.key ?? "rest"}>
+              {!(last && upNext) && (busy || segment.steps.length > 0) && (
+                <Activity
+                  steps={segment.steps}
+                  working={busy}
+                  durationMs={
+                    last && startedAt !== undefined && finishedAt !== undefined
+                      ? finishedAt - startedAt
+                      : undefined
+                  }
+                />
+              )}
+              {segment.text && (
+                <MessageResponse isAnimating={busy}>
+                  {segment.text}
+                </MessageResponse>
+              )}
+              {segment.asks.map((ask) => (
+                <PermissionCard
+                  key={ask.step.key}
+                  ask={ask}
+                  name={teammate.name}
+                  fullAuto={teammate.fullAuto}
+                  settingsHref={settingsHref}
+                  onAnswer={
+                    onAnswer &&
+                    ((approved) => onAnswer(ask.approvalId, approved))
+                  }
+                />
+              ))}
+            </Fragment>
+          )
+        })}
         {notices.map((notice) => (
           <TurnNotice
             key={notice.reason}
             notice={notice}
             name={teammate.name}
-            settingsHref={`/teammates/${teammate.id}`}
+            settingsHref={settingsHref}
             onKeepGoing={onKeepGoing}
           />
         ))}

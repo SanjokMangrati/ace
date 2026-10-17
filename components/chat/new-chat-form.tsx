@@ -25,7 +25,7 @@ export function NewChatForm({
 }: {
   chatId: string
   defaultBotId: string
-  teammates: (Omit<ChatTeammate, "connected"> & { job: string })[]
+  teammates: (Omit<ChatTeammate, "connected" | "fullAuto"> & { job: string })[]
 }) {
   const form = useForm<NewChatInput>({
     resolver: zodResolver(newChatSchema),

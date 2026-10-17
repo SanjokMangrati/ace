@@ -1,7 +1,8 @@
-import { auth, NotFoundError, sessions, wait } from "@trigger.dev/sdk"
+import { auth, NotFoundError, sessions } from "@trigger.dev/sdk"
 import { chat } from "@trigger.dev/sdk/ai"
 import { TEAMMATE_CHAT_TASK } from "@/lib/chat"
 import type { ChatRuntime } from "@/server/ports/chat-runtime"
+import { triggerTurnRuntime } from "./turn-runtime"
 
 export function createTriggerChatRuntime(): ChatRuntime {
   const start = chat.createStartSessionAction(TEAMMATE_CHAT_TASK)
@@ -20,12 +21,7 @@ export function createTriggerChatRuntime(): ChatRuntime {
         if (!(error instanceof NotFoundError)) throw error
       }
     },
-    createWait: async (timeoutSec) => {
-      const token = await wait.createToken({ timeout: `${timeoutSec}s` })
-      return token.id
-    },
-    completeWait: async (ref) => {
-      await wait.completeToken(ref, {})
-    },
+    createWait: triggerTurnRuntime.createWait,
+    completeWait: triggerTurnRuntime.completeWait,
   }
 }

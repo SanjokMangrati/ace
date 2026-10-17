@@ -1,6 +1,7 @@
 import "server-only"
 import { and, asc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm"
-import { db } from "@/server/db/client"
+import { db, type Tx } from "@/server/db/client"
+import { awaitsAnswer } from "@/server/db/queries/chats"
 import { bot, chat, sandbox, sandboxWaiter, turn } from "@/server/db/schema"
 
 export async function saveSandbox(values: {
@@ -107,7 +108,7 @@ export async function endTakeover(botId: string, waitRef: string) {
 export type LeaseHolder = {
   chatId: string
   title: string
-  waitingOn: "work" | "you"
+  waitingOn: "work" | "control" | "answer"
 }
 
 type LeaseClaim =
@@ -119,11 +120,10 @@ type LeaseClaim =
       expiresAt: Date
     }
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-
 const openTurnChat = {
   chatId: chat.id,
   title: chat.title,
+  asking: sql<boolean>`${awaitsAnswer}`,
 }
 
 async function lockSandbox(tx: Tx, botId: string) {
@@ -259,7 +259,12 @@ export async function claimLease(
       holder: {
         chatId: holder.chatId,
         title: holder.title,
-        waitingOn: row.control === "user" ? "you" : "work",
+        waitingOn:
+          row.control === "user"
+            ? "control"
+            : holder.asking
+              ? "answer"
+              : "work",
       },
       expiresAt,
     }

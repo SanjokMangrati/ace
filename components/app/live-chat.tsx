@@ -2,7 +2,13 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 
-type LiveChat = { id: string; working: boolean; queued: boolean } | null
+export type LiveStatus = {
+  working: boolean
+  queued: boolean
+  needsYou: boolean
+}
+
+type LiveChat = (LiveStatus & { id: string }) | null
 
 const LiveChatContext = createContext<{
   live: LiveChat
@@ -20,12 +26,11 @@ export function useLiveChat() {
 
 export function useReportLiveChat(
   id: string,
-  working: boolean,
-  queued: boolean
+  { working, queued, needsYou }: LiveStatus
 ) {
   const { setLive } = useContext(LiveChatContext)
   useEffect(() => {
-    setLive({ id, working, queued })
+    setLive({ id, working, queued, needsYou })
     return () => setLive(null)
-  }, [id, working, queued, setLive])
+  }, [id, working, queued, needsYou, setLive])
 }

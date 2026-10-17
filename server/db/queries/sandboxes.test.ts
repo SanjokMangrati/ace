@@ -174,7 +174,7 @@ describe("sandbox lease", () => {
       .where(eq(schema.sandbox.botId, botId))
 
     expect(await claimLease(botId, waiter, TTL)).toMatchObject({
-      holder: { waitingOn: "you" },
+      holder: { waitingOn: "control" },
     })
   })
 

@@ -10,12 +10,16 @@ import {
   inArray,
   isNotNull,
   isNull,
+  not,
   sql,
   sum,
 } from "drizzle-orm"
+import { askBeforeFrom } from "@/lib/bot-schemas"
 import type { TeammateMessage } from "@/lib/chat"
-import { db } from "@/server/db/client"
+import type { ApprovalAnswer } from "@/server/agent/approvals"
+import { db, type Tx } from "@/server/db/client"
 import {
+  approval,
   bot,
   chat,
   message,
@@ -35,11 +39,24 @@ type TranscriptChange =
   | { op: "truncateAfter"; afterId: string }
   | { op: "state"; value: unknown }
 
+export const awaitsAnswer = exists(
+  db
+    .select({ id: approval.toolCallId })
+    .from(approval)
+    .where(and(eq(approval.turnId, turn.id), eq(approval.status, "pending")))
+)
+
+const openTurn = and(eq(turn.chatId, chat.id), isNull(turn.endedAt))
+
 const working = exists(
   db
     .select({ id: turn.id })
     .from(turn)
-    .where(and(eq(turn.chatId, chat.id), isNull(turn.endedAt)))
+    .where(and(openTurn, not(awaitsAnswer)))
+)
+
+const needsYou = exists(
+  db.select({ id: turn.id }).from(turn).where(and(openTurn, awaitsAnswer))
 )
 
 const queued = exists(
@@ -47,7 +64,7 @@ const queued = exists(
     .select({ id: turn.id })
     .from(turn)
     .innerJoin(sandboxWaiter, eq(sandboxWaiter.turnId, turn.id))
-    .where(and(eq(turn.chatId, chat.id), isNull(turn.endedAt)))
+    .where(openTurn)
 )
 
 const inControl = exists(
@@ -71,6 +88,7 @@ export async function listChats(userId: string) {
       title: chat.title,
       updatedAt: chat.updatedAt,
       working: sql<boolean>`${working}`,
+      needsYou: sql<boolean>`${needsYou}`,
       queued: sql<boolean>`${queued}`,
       inControl: sql<boolean>`${inControl}`,
       bot: botColumns,
@@ -90,6 +108,7 @@ export async function findChat(userId: string, id: string) {
       bot: {
         ...botColumns,
         connected: sql<boolean>`${isNotNull(bot.providerKeyId)}`,
+        fullAuto: bot.fullAuto,
       },
       control: sandbox.control,
     })
@@ -100,14 +119,6 @@ export async function findChat(userId: string, id: string) {
   if (!row) return null
   const { messages } = await loadTranscript<TeammateMessage>(id)
   return { ...row, messages }
-}
-
-export async function ownsChat(userId: string, id: string) {
-  const rows = await db
-    .select({ id: chat.id })
-    .from(chat)
-    .where(and(eq(chat.id, id), eq(chat.userId, userId)))
-  return rows.length > 0
 }
 
 export async function findChatBotId(userId: string, id: string) {
@@ -162,11 +173,18 @@ export async function findChatContext(chatId: string) {
           maxSteps: true,
           taskBudgetUsd: true,
           dailyBudgetUsd: true,
+          fullAuto: true,
         },
         with: {
           providerKey: {
-            columns: { provider: true, baseUrl: true, sealedKey: true },
+            columns: {
+              provider: true,
+              baseUrl: true,
+              sealedKey: true,
+              judgeModelId: true,
+            },
           },
+          toolPolicies: { columns: { tool: true, requiresApproval: true } },
           notes: {
             columns: { id: true, content: true },
             orderBy: (note) => desc(note.updatedAt),
@@ -175,7 +193,9 @@ export async function findChatContext(chatId: string) {
       },
     },
   })
-  return row?.bot ?? null
+  if (!row) return null
+  const { toolPolicies, ...bot } = row.bot
+  return { ...bot, askBefore: askBeforeFrom(toolPolicies) }
 }
 
 export async function loadTranscript<TMessage extends UIMessage = UIMessage>(
@@ -297,8 +317,6 @@ export async function saveTranscript(
   })
 }
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-
 async function endOpenTurns(tx: Tx, chatId: string) {
   const ended = await tx
     .update(turn)
@@ -358,15 +376,68 @@ export async function startTurn(chatId: string, botId: string) {
   })
 }
 
+export type TurnTotals = {
+  stepCount: number
+  inputTokens: number
+  outputTokens: number
+  costUsd: number
+}
+
+export async function resumeTurn(chatId: string, answers: ApprovalAnswer[]) {
+  return db.transaction(async (tx) => {
+    const [open] = await tx
+      .select({
+        id: turn.id,
+        stepCount: turn.stepCount,
+        inputTokens: turn.inputTokens,
+        outputTokens: turn.outputTokens,
+        costUsd: turn.costUsd,
+      })
+      .from(turn)
+      .where(and(eq(turn.chatId, chatId), isNull(turn.endedAt)))
+      .orderBy(desc(turn.startedAt))
+      .limit(1)
+      .for("update")
+    if (!open) return null
+    const decidedAt = new Date()
+    const decided: (ApprovalAnswer & { at: number })[] = []
+    for (const answer of answers) {
+      const call = and(
+        eq(approval.turnId, open.id),
+        eq(approval.toolCallId, answer.toolCallId)
+      )
+      const rows = await tx
+        .update(approval)
+        .set({ status: answer.approved ? "approved" : "denied", decidedAt })
+        .where(and(call, eq(approval.status, "pending")))
+        .returning({ toolCallId: approval.toolCallId })
+      if (rows.length === 0) continue
+      decided.push({ ...answer, at: decidedAt.getTime() })
+      if (!answer.approved) {
+        await tx
+          .update(toolCall)
+          .set({ status: "denied", finishedAt: decidedAt })
+          .where(
+            and(
+              eq(toolCall.turnId, open.id),
+              eq(toolCall.toolCallId, answer.toolCallId)
+            )
+          )
+      }
+    }
+    if (decided.length === 0) return null
+    const { id, ...totals } = open
+    return { id, totals, decided }
+  })
+}
+
+export async function pauseTurn(id: string, totals: TurnTotals) {
+  await db.update(turn).set(totals).where(eq(turn.id, id))
+}
+
 export async function finishTurn(
   id: string,
-  values: {
-    endReason: TurnEndReason
-    stepCount: number
-    inputTokens: number
-    outputTokens: number
-    costUsd: number
-  }
+  values: TurnTotals & { endReason: TurnEndReason }
 ) {
   await db
     .update(turn)
