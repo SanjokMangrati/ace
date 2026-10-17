@@ -141,8 +141,15 @@ export function ChatView({
   const [fullSize, setFullSize] = useState(false)
   const wide = useWide()
   const working = status === "submitted" || status === "streaming"
+  const last = messages.at(-1)
+  const queued =
+    working &&
+    last?.role === "assistant" &&
+    last.parts.some(
+      (part) => part.type === "data-queue" && part.data.startedAt === undefined
+    )
   const canSend = teammate.connected && !working && !inControl
-  useReportLiveChat(chatId, working)
+  useReportLiveChat(chatId, working, queued)
 
   function send(text: string) {
     sendMessage({ text, metadata: { createdAt: Date.now() } })
@@ -174,7 +181,6 @@ export function ChatView({
     return () => removeEventListener("keydown", shrink)
   }, [fullSize])
 
-  const last = messages.at(-1)
   const screenLabel = `${teammate.name}'s screen`
   const chat = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -307,6 +313,8 @@ export function ChatView({
         </div>
         {inControl ? (
           <Status tone="control">You're in control</Status>
+        ) : queued ? (
+          <Status tone="waiting">Up next</Status>
         ) : (
           working && <Status tone="working">Working</Status>
         )}

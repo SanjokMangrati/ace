@@ -1,4 +1,4 @@
-import type { TeammateMessage, TurnNotice } from "@/lib/chat"
+import type { QueueEvent, TeammateMessage, TurnNotice } from "@/lib/chat"
 
 type Part = TeammateMessage["parts"][number]
 
@@ -155,12 +155,15 @@ export function readMessage(message: TeammateMessage) {
   const steps: Step[] = []
   const texts: string[] = []
   const notices: TurnNotice[] = []
+  let queue: QueueEvent | undefined
 
   for (const [index, part] of message.parts.entries()) {
     if (part.type === "text") {
       if (part.text.trim()) texts.push(part.text)
     } else if (part.type === "data-notice") {
       notices.push(part.data)
+    } else if (part.type === "data-queue") {
+      queue = part.data
     } else {
       const step = stepOf(part, index)
       const last = steps.at(-1)
@@ -172,5 +175,5 @@ export function readMessage(message: TeammateMessage) {
     }
   }
 
-  return { steps, text: texts.join("\n\n"), notices }
+  return { steps, text: texts.join("\n\n"), notices, queue }
 }

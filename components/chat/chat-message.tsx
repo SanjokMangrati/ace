@@ -14,7 +14,7 @@ import type { TeammateMessage } from "@/lib/chat"
 import { clockTime } from "@/lib/format"
 import { Activity } from "./activity"
 import { readMessage } from "./message-parts"
-import { TurnNotice } from "./turn-notice"
+import { TurnNotice, UpNextNotice } from "./turn-notice"
 
 export type ChatTeammate = {
   id: string
@@ -118,9 +118,10 @@ export function TeammateReply({
   error?: string
   onKeepGoing?: () => void
 }) {
-  const { steps, text, notices } = message
+  const { steps, text, notices, queue } = message
     ? readMessage(message)
-    : { steps: [], text: "", notices: [] }
+    : { steps: [], text: "", notices: [], queue: undefined }
+  const upNext = working && queue?.startedAt === undefined ? queue : undefined
   if (error && !notices.some((notice) => notice.reason === "error")) {
     notices.push({ reason: "error", message: error })
   }
@@ -139,7 +140,8 @@ export function TeammateReply({
           <b className="font-display text-name">{teammate.name}</b>
           <Time at={createdAt} className="text-caption text-ink-3" />
         </div>
-        {(working || steps.length > 0) && (
+        {upNext && <UpNextNotice queue={upNext} name={teammate.name} />}
+        {!upNext && (working || steps.length > 0) && (
           <Activity
             steps={steps}
             working={working}

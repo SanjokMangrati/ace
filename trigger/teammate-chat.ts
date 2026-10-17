@@ -47,6 +47,13 @@ import { loadScreenshot, saveScreenshot } from "@/server/db/queries/screenshots"
 import { env } from "@/server/env"
 import type { ComputerHandlers } from "@/server/ports/computer"
 import type { Sandbox } from "@/server/ports/sandbox"
+import {
+  LEASE_TTL_MS,
+  releaseTurnLease,
+  type SandboxLease,
+  sandboxLease,
+  TAKEOVER_TIMEOUT_SEC,
+} from "@/server/sandbox/lease"
 
 const models = createAiSdkModels()
 const keyVault = createEnvKeyVault(env.ENCRYPTION_KEY)
@@ -74,6 +81,7 @@ type Turn = {
   sandbox?: Promise<Sandbox>
   sandboxUse?: SandboxUse
   computer?: ComputerHandlers
+  lease: SandboxLease
 }
 
 const turn = chat.local<{ current: Turn | null }>({ id: "turn" })
@@ -110,8 +118,8 @@ function openSandbox() {
   return current.sandbox
 }
 
-async function waitForTakeover(botId: string) {
-  const takeover = await findTakeover(botId)
+async function waitForTakeover(current: Turn) {
+  const takeover = await findTakeover(current.botId)
   if (!takeover) return false
   const tookAt = (takeover.since ?? new Date()).getTime()
   runtime.write({
@@ -119,8 +127,12 @@ async function waitForTakeover(botId: string) {
     id: takeover.waitRef,
     data: { tookAt },
   })
+  await current.lease.park(
+    new Date(tookAt + TAKEOVER_TIMEOUT_SEC * 1000 + LEASE_TTL_MS)
+  )
   await runtime.waitFor(takeover.waitRef)
-  await endTakeover(botId, takeover.waitRef)
+  await endTakeover(current.botId, takeover.waitRef)
+  await current.lease.unpark()
   runtime.write({
     type: "data-control",
     id: takeover.waitRef,
@@ -176,7 +188,12 @@ export const teammateChat = chat
     onBoot: () => {
       turn.init({ current: null })
     },
-    onFailure: ({ payload }) => endRunningTurns(payload.chatId),
+    onFailure: async ({ payload }) => {
+      const ended = await endRunningTurns(payload.chatId)
+      await Promise.all(
+        ended.map((row) => releaseTurnLease(runtime, row.botId, row.id))
+      )
+    },
     run: async ({ chatId, messages, tools, signal, streamText }) => {
       const bot = await findChatContext(chatId)
       if (!bot) throw new Error("This chat no longer exists.")
@@ -189,8 +206,10 @@ export const teammateChat = chat
 
       const model = await modelCatalog.find(key.provider, bot.modelId)
       const canSeeScreen = model?.vision ?? false
+      const turnId = await startTurn(chatId, bot.id)
+      const queueId = `queue-${turnId}`
       const current: Turn = {
-        id: await startTurn(chatId, bot.id),
+        id: turnId,
         botId: bot.id,
         price: model,
         maxSteps: bot.maxSteps,
@@ -199,6 +218,19 @@ export const teammateChat = chat
         failure: `${bot.name} couldn't reach ${providerLabel(key.provider)}. Send your message again in a moment.`,
         steps: [],
         failed: false,
+        lease: sandboxLease({
+          botId: bot.id,
+          turnId,
+          runtime,
+          onQueued: (holder) =>
+            runtime.write({ type: "data-queue", id: queueId, data: holder }),
+          onStarted: (waitedFor) =>
+            runtime.write({
+              type: "data-queue",
+              id: queueId,
+              data: { ...waitedFor, startedAt: Date.now() },
+            }),
+        }),
       }
       turn.current = current
 
@@ -214,7 +246,7 @@ export const teammateChat = chat
           desktop: async () => (await openSandbox()).desktop(),
           saveScreenshot: (data) => saveScreenshot(chatId, data),
           waitForControl: async () =>
-            (await waitForTakeover(bot.id)) ? HANDED_BACK : null,
+            (await waitForTakeover(current)) ? HANDED_BACK : null,
         })
         current.computer = {
           execute,
@@ -250,7 +282,8 @@ export const teammateChat = chat
           ({ steps }) => turnCostUsd(current, steps) >= bot.taskBudgetUsd,
         ],
         prepareStep: async ({ initialMessages, responseMessages }) => {
-          if (await waitForTakeover(bot.id)) {
+          await current.lease.ensure()
+          if (await waitForTakeover(current)) {
             handBacks.push({
               after: responseMessages.length,
               message: await handBackMessage(current.computer),
@@ -303,5 +336,6 @@ export const teammateChat = chat
         ...usage,
         costUsd: cost,
       })
+      await current.lease.release()
     },
   })

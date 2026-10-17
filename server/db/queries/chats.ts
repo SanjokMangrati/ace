@@ -20,6 +20,7 @@ import {
   message,
   type RuntimeCursors,
   sandbox,
+  sandboxWaiter,
   turn,
   type turnEndReason,
 } from "@/server/db/schema"
@@ -36,6 +37,14 @@ const working = exists(
   db
     .select({ id: turn.id })
     .from(turn)
+    .where(and(eq(turn.chatId, chat.id), isNull(turn.endedAt)))
+)
+
+const queued = exists(
+  db
+    .select({ id: turn.id })
+    .from(turn)
+    .innerJoin(sandboxWaiter, eq(sandboxWaiter.turnId, turn.id))
     .where(and(eq(turn.chatId, chat.id), isNull(turn.endedAt)))
 )
 
@@ -60,6 +69,7 @@ export async function listChats(userId: string) {
       title: chat.title,
       updatedAt: chat.updatedAt,
       working: sql<boolean>`${working}`,
+      queued: sql<boolean>`${queued}`,
       inControl: sql<boolean>`${inControl}`,
       bot: botColumns,
     })
@@ -320,10 +330,11 @@ export async function finishTurn(
 }
 
 export async function endRunningTurns(chatId: string) {
-  await db
+  return db
     .update(turn)
     .set({ endReason: "error", endedAt: new Date() })
     .where(and(eq(turn.chatId, chatId), isNull(turn.endedAt)))
+    .returning({ id: turn.id, botId: turn.botId })
 }
 
 export async function spentSince(botId: string, since: Date) {

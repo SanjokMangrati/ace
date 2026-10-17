@@ -29,7 +29,7 @@ import {
 } from "@/server/db/queries/bots"
 import { listBotChatIds } from "@/server/db/queries/chats"
 import { findProviderKey } from "@/server/db/queries/provider-keys"
-import { findBotSandbox } from "@/server/db/queries/sandboxes"
+import { findBotSandboxRef } from "@/server/db/queries/sandboxes"
 import { readPicture } from "@/server/picture"
 import { sealProviderKey } from "@/server/seal-provider-key"
 import { requireUser } from "@/server/session"
@@ -151,8 +151,8 @@ export async function deleteTeammate(botId: string): Promise<Failure> {
       chatRuntime.closeSession(chatId, "teammate deleted")
     )
   )
-  const sandbox = await findBotSandbox(user.id, id.data)
-  if (sandbox) await sandboxes.destroy(sandbox.providerRef)
+  const sandboxRef = await findBotSandboxRef(user.id, id.data)
+  if (sandboxRef) await sandboxes.destroy(sandboxRef)
   if (!(await deleteBot(user.id, id.data))) return fail(TEAMMATE_NOT_FOUND)
 
   revalidatePath("/", "layout")
