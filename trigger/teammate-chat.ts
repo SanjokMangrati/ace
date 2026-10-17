@@ -17,6 +17,7 @@ import {
   pruneScreenshots,
   withHandBacks,
 } from "@/server/agent/computer"
+import { interruptedNote, withLedger } from "@/server/agent/ledger"
 import {
   costUsd,
   DAY_MS,
@@ -44,6 +45,7 @@ import {
   saveSandbox,
 } from "@/server/db/queries/sandboxes"
 import { loadScreenshot, saveScreenshot } from "@/server/db/queries/screenshots"
+import { toolCallLedger } from "@/server/db/queries/tool-calls"
 import { env } from "@/server/env"
 import type { ComputerHandlers } from "@/server/ports/computer"
 import type { Sandbox } from "@/server/ports/sandbox"
@@ -206,7 +208,7 @@ export const teammateChat = chat
 
       const model = await modelCatalog.find(key.provider, bot.modelId)
       const canSeeScreen = model?.vision ?? false
-      const turnId = await startTurn(chatId, bot.id)
+      const { id: turnId, interrupted } = await startTurn(chatId, bot.id)
       const queueId = `queue-${turnId}`
       const current: Turn = {
         id: turnId,
@@ -274,8 +276,16 @@ export const teammateChat = chat
           bot.modelId
         ),
         system: systemPrompt({ ...bot, canSeeScreen }),
-        messages,
-        tools: { ...withoutScreen, ...screenTools },
+        messages: interrupted.length
+          ? [
+              ...messages,
+              { role: "user", content: interruptedNote(interrupted) },
+            ]
+          : messages,
+        tools: withLedger(
+          { ...withoutScreen, ...screenTools },
+          toolCallLedger(turnId)
+        ),
         abortSignal: signal,
         stopWhen: [
           isStepCount(bot.maxSteps),
