@@ -17,10 +17,12 @@ const messageSchema = z
 
 export const newChatSchema = createInsertSchema(chat, {
   id: () => chatIdSchema,
-  botId: () => z.uuid({ error: "Pick a teammate first." }),
 })
-  .pick({ id: true, botId: true })
+  .pick({ id: true })
   .required()
-  .extend({ message: messageSchema })
+  .extend({
+    botIds: z.array(z.uuid()).min(1, "Pick a teammate first."),
+    message: messageSchema,
+  })
 
 export type NewChatInput = z.infer<typeof newChatSchema>

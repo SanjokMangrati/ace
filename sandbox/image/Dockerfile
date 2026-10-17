@@ -35,9 +35,14 @@ RUN apt-get update && apt-get install -y \
     libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN echo 'export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --no-sandbox --test-type --disable-dev-shm-usage --no-first-run --no-default-browser-check"' > /etc/chromium.d/ace
+RUN echo 'export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --no-sandbox --test-type --disable-dev-shm-usage --no-first-run --no-default-browser-check --lang=en-US"' > /etc/chromium.d/ace
 
-RUN useradd -m daytona && echo "daytona ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/91-daytona
+RUN pip install --no-cache-dir trafilatura requests beautifulsoup4
+
+COPY ace-web /usr/local/bin/ace-web
+RUN chmod +x /usr/local/bin/ace-web
+
+RUN useradd -m -s /bin/bash daytona && echo "daytona ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/91-daytona
 
 RUN bash -c "source /usr/local/share/nvm/nvm.sh && nvm install 24 && nvm alias default 24" \
     && chown -R daytona:daytona /usr/local/share/nvm
@@ -55,6 +60,6 @@ ENV LANG=en_US.UTF-8 \
 USER daytona
 WORKDIR /home/daytona
 
-RUN touch ~/.zshrc
+RUN touch ~/.bashrc
 
 ENTRYPOINT ["sleep", "infinity"]

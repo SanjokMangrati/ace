@@ -14,6 +14,7 @@ import { Composer, ComposerBar, ComposerHint } from "@/components/ui/composer"
 import { Spinner } from "@/components/ui/spinner"
 import { Tile } from "@/components/ui/tile"
 import { callAction, setActionError } from "@/lib/action-client"
+import { nameList } from "@/lib/chat"
 import { type NewChatInput, newChatSchema } from "@/lib/chat-schemas"
 import type { ChatTeammate } from "./chat-message"
 import { setPendingMessage, takePendingMessage } from "./pending-message"
@@ -29,17 +30,18 @@ export function NewChatForm({
 }) {
   const form = useForm<NewChatInput>({
     resolver: zodResolver(newChatSchema),
-    defaultValues: { id: chatId, botId: defaultBotId, message: "" },
+    defaultValues: { id: chatId, botIds: [defaultBotId], message: "" },
   })
-  const [botId, message] = useWatch({
+  const [botIds, message] = useWatch({
     control: form.control,
-    name: ["botId", "message"],
+    name: ["botIds", "message"],
   })
   const { isSubmitting, isSubmitSuccessful } = useFormState({
     control: form.control,
   })
   const pending = isSubmitting || isSubmitSuccessful
-  const picked = teammates.find((teammate) => teammate.id === botId)
+  const picked = teammates.filter((teammate) => botIds.includes(teammate.id))
+  const names = nameList(picked.map((teammate) => teammate.name))
 
   async function onSubmit(values: NewChatInput) {
     setPendingMessage(values.id, values.message)
@@ -58,7 +60,7 @@ export function NewChatForm({
       <FormError control={form.control} />
       <PickField
         control={form.control}
-        name="botId"
+        name="botIds"
         label="Teammates"
         options={teammates.map((teammate) => ({
           value: teammate.id,
@@ -91,16 +93,22 @@ export function NewChatForm({
           name="message"
           rows={3}
           placeholder={
-            picked ? `What should ${picked.name} do?` : "Pick a teammate first"
+            picked.length > 1
+              ? "What should the team do? Type @ to pick who starts."
+              : picked.length === 1
+                ? `What should ${names} do?`
+                : "Pick a teammate first"
           }
           aria-label="First message"
         />
         <ComposerBar>
-          <ComposerHint />
+          <ComposerHint>
+            {picked.length > 1 && `A group chat with ${names}`}
+          </ComposerHint>
           <Button
             type="submit"
             size="sm"
-            disabled={pending || !picked || !message.trim()}
+            disabled={pending || picked.length === 0 || !message.trim()}
           >
             {pending ? (
               <Spinner data-icon="inline-start" />

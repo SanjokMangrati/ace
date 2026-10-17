@@ -1,5 +1,6 @@
-import { wait } from "@trigger.dev/sdk"
+import { sessions, wait } from "@trigger.dev/sdk"
 import { chat } from "@trigger.dev/sdk/ai"
+import type { ChatInputChunk } from "@trigger.dev/sdk/chat"
 import type { TurnRuntime } from "@/server/ports/turn-runtime"
 
 export const triggerTurnRuntime: TurnRuntime = {
@@ -14,4 +15,11 @@ export const triggerTurnRuntime: TurnRuntime = {
     await wait.forToken(ref)
   },
   write: (chunk) => chat.response.write(chunk),
+  send: async (chatId, message) => {
+    const chunk: ChatInputChunk = {
+      kind: "message",
+      payload: { chatId, trigger: "submit-message", message },
+    }
+    await sessions.open(chatId).in.send(chunk)
+  },
 }

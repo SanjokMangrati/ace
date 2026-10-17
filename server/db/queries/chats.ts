@@ -2,6 +2,7 @@ import "server-only"
 import type { UIMessage } from "ai"
 import {
   and,
+  asc,
   desc,
   eq,
   exists,
@@ -22,6 +23,8 @@ import {
   approval,
   bot,
   chat,
+  chatMember,
+  handoff,
   message,
   type RuntimeCursors,
   sandbox,
@@ -81,8 +84,27 @@ const botColumns = {
   updatedAt: bot.updatedAt,
 }
 
+async function listMembers(chatIds: string[]) {
+  const rows = await db
+    .select({
+      chatId: chatMember.chatId,
+      ...botColumns,
+      job: bot.job,
+      connected: sql<boolean>`${isNotNull(bot.providerKeyId)}`,
+      fullAuto: bot.fullAuto,
+    })
+    .from(chatMember)
+    .innerJoin(bot, eq(bot.id, chatMember.botId))
+    .where(inArray(chatMember.chatId, chatIds))
+    .orderBy(asc(chatMember.position))
+  return (chatId: string) =>
+    rows
+      .filter((row) => row.chatId === chatId)
+      .map(({ chatId: _chatId, ...member }) => member)
+}
+
 export async function listChats(userId: string) {
-  return db
+  const rows = await db
     .select({
       id: chat.id,
       title: chat.title,
@@ -91,62 +113,84 @@ export async function listChats(userId: string) {
       needsYou: sql<boolean>`${needsYou}`,
       queued: sql<boolean>`${queued}`,
       inControl: sql<boolean>`${inControl}`,
-      bot: botColumns,
     })
     .from(chat)
-    .innerJoin(bot, eq(bot.id, chat.botId))
     .where(eq(chat.userId, userId))
     .orderBy(desc(chat.updatedAt))
+  const membersOf = await listMembers(rows.map((row) => row.id))
+  return rows.map((row) => ({ ...row, bots: membersOf(row.id) }))
+}
+
+async function lastTurnBotId(chatId: string) {
+  const [last] = await db
+    .select({ botId: turn.botId })
+    .from(turn)
+    .where(eq(turn.chatId, chatId))
+    .orderBy(desc(turn.startedAt))
+    .limit(1)
+  return last?.botId ?? null
 }
 
 export async function findChat(userId: string, id: string) {
   const [row] = await db
-    .select({
-      id: chat.id,
-      title: chat.title,
-      cursors: chat.runtimeCursors,
-      bot: {
-        ...botColumns,
-        connected: sql<boolean>`${isNotNull(bot.providerKeyId)}`,
-        fullAuto: bot.fullAuto,
-      },
-      control: sandbox.control,
-    })
+    .select({ id: chat.id, title: chat.title, cursors: chat.runtimeCursors })
     .from(chat)
-    .innerJoin(bot, eq(bot.id, chat.botId))
-    .leftJoin(sandbox, eq(sandbox.botId, chat.botId))
     .where(and(eq(chat.id, id), eq(chat.userId, userId)))
   if (!row) return null
-  const { messages } = await loadTranscript<TeammateMessage>(id)
-  return { ...row, messages }
+  const [membersOf, [controlled], lastBotId, { messages }] = await Promise.all([
+    listMembers([id]),
+    db
+      .select({ botId: sandbox.botId })
+      .from(sandbox)
+      .where(and(eq(sandbox.controlChatId, id), eq(sandbox.control, "user"))),
+    lastTurnBotId(id),
+    loadTranscript<TeammateMessage>(id),
+  ])
+  return {
+    ...row,
+    bots: membersOf(id),
+    controlBotId: controlled?.botId ?? null,
+    lastBotId,
+    messages,
+  }
 }
 
-export async function findChatBotId(userId: string, id: string) {
-  const [row] = await db
-    .select({ botId: chat.botId })
-    .from(chat)
+export async function findChatBotIds(userId: string, id: string) {
+  const rows = await db
+    .select({ botId: chatMember.botId })
+    .from(chatMember)
+    .innerJoin(chat, eq(chat.id, chatMember.chatId))
     .where(and(eq(chat.id, id), eq(chat.userId, userId)))
-  return row?.botId ?? null
+  return rows.map((row) => row.botId)
 }
 
 export async function listBotChatIds(userId: string, botId: string) {
   const rows = await db
     .select({ id: chat.id })
     .from(chat)
-    .where(and(eq(chat.botId, botId), eq(chat.userId, userId)))
+    .innerJoin(chatMember, eq(chatMember.chatId, chat.id))
+    .where(and(eq(chatMember.botId, botId), eq(chat.userId, userId)))
   return rows.map((row) => row.id)
 }
 
 export async function insertChat(
   userId: string,
-  values: { id: string; botId: string; title: string }
+  values: { id: string; botIds: string[]; title: string }
 ) {
+  const { botIds, ...row } = values
   const owned = await db.$count(
     bot,
-    and(eq(bot.id, values.botId), eq(bot.userId, userId))
+    and(inArray(bot.id, botIds), eq(bot.userId, userId))
   )
-  if (owned === 0) return false
-  await db.insert(chat).values({ ...values, userId })
+  if (owned !== botIds.length) return false
+  await db.transaction(async (tx) => {
+    await tx.insert(chat).values({ ...row, userId })
+    await tx
+      .insert(chatMember)
+      .values(
+        botIds.map((botId, position) => ({ chatId: row.id, botId, position }))
+      )
+  })
   return true
 }
 
@@ -158,44 +202,69 @@ export async function deleteChat(userId: string, id: string) {
   return rows.length > 0
 }
 
-export async function findChatContext(chatId: string) {
-  const row = await db.query.chat.findFirst({
-    where: eq(chat.id, chatId),
-    columns: { id: true },
+export async function findChatTeam(chatId: string) {
+  const [membersOf, lastBotId] = await Promise.all([
+    listMembers([chatId]),
+    lastTurnBotId(chatId),
+  ])
+  return { bots: membersOf(chatId), lastBotId }
+}
+
+export async function findTeammate(botId: string) {
+  const row = await db.query.bot.findFirst({
+    where: eq(bot.id, botId),
+    columns: {
+      id: true,
+      name: true,
+      job: true,
+      instructions: true,
+      modelId: true,
+      maxSteps: true,
+      taskBudgetUsd: true,
+      dailyBudgetUsd: true,
+      fullAuto: true,
+    },
     with: {
-      bot: {
+      providerKey: {
         columns: {
-          id: true,
-          name: true,
-          job: true,
-          instructions: true,
-          modelId: true,
-          maxSteps: true,
-          taskBudgetUsd: true,
-          dailyBudgetUsd: true,
-          fullAuto: true,
+          provider: true,
+          baseUrl: true,
+          sealedKey: true,
+          judgeModelId: true,
         },
-        with: {
-          providerKey: {
-            columns: {
-              provider: true,
-              baseUrl: true,
-              sealedKey: true,
-              judgeModelId: true,
-            },
-          },
-          toolPolicies: { columns: { tool: true, requiresApproval: true } },
-          notes: {
-            columns: { id: true, content: true },
-            orderBy: (note) => desc(note.updatedAt),
-          },
-        },
+      },
+      toolPolicies: { columns: { tool: true, requiresApproval: true } },
+      notes: {
+        columns: { id: true, content: true },
+        orderBy: (note) => desc(note.updatedAt),
       },
     },
   })
   if (!row) return null
-  const { toolPolicies, ...bot } = row.bot
-  return { ...bot, askBefore: askBeforeFrom(toolPolicies) }
+  const { toolPolicies, ...rest } = row
+  return { ...rest, askBefore: askBeforeFrom(toolPolicies) }
+}
+
+export async function listHops(chatId: string, userMessageId: string) {
+  return db
+    .select({ fromBotId: handoff.fromBotId, toBotId: handoff.toBotId })
+    .from(handoff)
+    .where(
+      and(
+        eq(handoff.chatId, chatId),
+        eq(handoff.userMessageId, userMessageId),
+        eq(handoff.accepted, true)
+      )
+    )
+    .orderBy(asc(handoff.createdAt))
+}
+
+export async function insertHandoff(values: typeof handoff.$inferInsert) {
+  const [row] = await db
+    .insert(handoff)
+    .values(values)
+    .returning({ id: handoff.id, createdAt: handoff.createdAt })
+  return row
 }
 
 export async function loadTranscript<TMessage extends UIMessage = UIMessage>(
@@ -388,6 +457,7 @@ export async function resumeTurn(chatId: string, answers: ApprovalAnswer[]) {
     const [open] = await tx
       .select({
         id: turn.id,
+        botId: turn.botId,
         stepCount: turn.stepCount,
         inputTokens: turn.inputTokens,
         outputTokens: turn.outputTokens,
@@ -426,8 +496,8 @@ export async function resumeTurn(chatId: string, answers: ApprovalAnswer[]) {
       }
     }
     if (decided.length === 0) return null
-    const { id, ...totals } = open
-    return { id, totals, decided }
+    const { id, botId, ...totals } = open
+    return { id, botId, totals, decided }
   })
 }
 

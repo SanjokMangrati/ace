@@ -60,7 +60,7 @@ export function SelectField<TValues extends FieldValues>({
           <Field data-invalid={fieldState.invalid} data-disabled={disabled}>
             <FieldTitle id={labelId}>{label}</FieldTitle>
             <Select
-              value={selected ? selected.value : null}
+              value={selected?.value ?? null}
               disabled={disabled}
               onValueChange={(value) => {
                 if (typeof value !== "string") return

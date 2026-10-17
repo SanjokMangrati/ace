@@ -1,7 +1,13 @@
 import { chat } from "@trigger.dev/sdk/ai"
-import type { ModelMessage, ToolSet } from "ai"
-import { TEAMMATE_CHAT_TASK, type TeammateMessage } from "@/lib/chat"
-import { providerLabel } from "@/lib/models"
+import { convertToModelMessages, type ModelMessage, type ToolSet } from "ai"
+import {
+  type HandoffEvent,
+  handoffMessage,
+  nextTeammate,
+  TEAMMATE_CHAT_TASK,
+  type TeammateMessage,
+} from "@/lib/chat"
+import { type CatalogModel, type Provider, providerLabel } from "@/lib/models"
 import { createAiGatewayCatalog } from "@/server/adapters/ai-gateway"
 import { createAiSdkModels } from "@/server/adapters/ai-sdk"
 import { createDaytonaSandboxes } from "@/server/adapters/daytona"
@@ -18,6 +24,11 @@ import {
   pruneScreenshots,
   withHandBacks,
 } from "@/server/agent/computer"
+import {
+  HandoffRejected,
+  handoffRejection,
+  handoffTools,
+} from "@/server/agent/handoff"
 import { interruptedNote, withLedger } from "@/server/agent/ledger"
 import {
   costUsd,
@@ -31,12 +42,17 @@ import {
 } from "@/server/agent/limits"
 import { noteTools } from "@/server/agent/notes"
 import { systemPrompt } from "@/server/agent/prompt"
-import { judgeRisk, type ToolRisk } from "@/server/agent/risk"
+import { judgeModelFor, judgeRisk, type ToolRisk } from "@/server/agent/risk"
 import { sandboxTools } from "@/server/agent/sandbox-tools"
+import { type TeamBot, teamPrompt, teamView } from "@/server/agent/team"
+import { webTools } from "@/server/agent/web-tools"
 import {
   endRunningTurns,
-  findChatContext,
+  findChatTeam,
+  findTeammate,
   finishTurn,
+  insertHandoff,
+  listHops,
   pauseTurn,
   resumeTurn,
   spentSince,
@@ -72,6 +88,23 @@ const runtime = triggerTurnRuntime
 const HANDED_BACK =
   "The person took control of your screen and has now given it back. They may have changed what's on it, so look at the screen again before you go on."
 
+const JUDGE_CHOICE_TTL_MS = 60 * 60 * 1000
+
+const providerModelCache = new Map<
+  Provider,
+  { models: Promise<CatalogModel[]>; at: number }
+>()
+
+function providerModels(provider: Provider) {
+  const cached = providerModelCache.get(provider)
+  if (cached && Date.now() - cached.at < JUDGE_CHOICE_TTL_MS) {
+    return cached.models
+  }
+  const models = modelCatalog.list(provider).catch(() => [])
+  providerModelCache.set(provider, { models, at: Date.now() })
+  return models
+}
+
 const NO_TOTALS: TurnTotals = {
   stepCount: 0,
   inputTokens: 0,
@@ -81,6 +114,10 @@ const NO_TOTALS: TurnTotals = {
 
 type Turn = {
   id: string
+  chatId: string
+  team: TeamBot[]
+  userMessageId: string
+  handoff?: { event: HandoffEvent; at: number }
   base: TurnTotals
   judgeUsd: number
   risks: Map<string, ToolRisk>
@@ -120,6 +157,10 @@ function turnCostUsd(current: Turn, steps: Turn["steps"]) {
   )
 }
 
+function teamNames(team: TeamBot[]) {
+  return new Map(team.map((bot) => [bot.id, bot.name]))
+}
+
 function openSandbox() {
   const current = currentTurn()
   current.sandbox ??= (async () => {
@@ -137,6 +178,40 @@ function openSandbox() {
     throw error
   })
   return current.sandbox
+}
+
+async function passTask(input: {
+  toBotId: string
+  summary: string
+  nextStep: string
+}) {
+  const current = currentTurn()
+  const names = teamNames(current.team)
+  const hop = {
+    chatId: current.chatId,
+    userMessageId: current.userMessageId,
+    fromBotId: current.botId,
+    ...input,
+  }
+  const reason = handoffRejection({
+    fromBotId: current.botId,
+    toBotId: input.toBotId,
+    memberIds: [...names.keys()],
+    hops: await listHops(current.chatId, current.userMessageId),
+    worked: current.base.stepCount + current.steps.length > 0,
+  })
+  const row = await insertHandoff({
+    ...hop,
+    accepted: reason === null,
+    rejectReason: reason,
+  })
+  if (reason) throw new HandoffRejected(reason)
+  const at = row.createdAt.getTime()
+  current.handoff = {
+    event: { id: row.id, fromBotId: current.botId, ...input },
+    at,
+  }
+  return { id: row.id, name: names.get(input.toBotId) ?? "", at }
 }
 
 async function waitForTakeover(current: Turn) {
@@ -176,7 +251,7 @@ async function handBackMessage(
 ): Promise<ModelMessage> {
   if (!computer) return { role: "user", content: HANDED_BACK }
   const output = await computer.toModelOutput(
-    await computer.execute({ type: "screenshot" })
+    await computer.execute([{ type: "screenshot" }])
   )
   const screen = output.type === "content" ? output.value : []
   return {
@@ -188,9 +263,9 @@ async function handBackMessage(
   }
 }
 
-function stamp(started: "createdAt" | "resumedAt") {
+function stamp(started: "createdAt" | "resumedAt", botId?: string) {
   return ({ part }: { part: { type: string } }) => {
-    if (part.type === "start") return { [started]: Date.now() }
+    if (part.type === "start") return { [started]: Date.now(), botId }
     if (part.type === "finish") return { finishedAt: Date.now() }
   }
 }
@@ -205,11 +280,13 @@ export const teammateChat = chat
   .agent({
     id: TEAMMATE_CHAT_TASK,
     storage: postgresTranscriptStorage,
-    tools: ({ chatId }) => ({
-      ...noteTools(chatId),
+    tools: {
+      ...noteTools(() => currentTurn().botId),
       ...sandboxTools(openSandbox),
+      ...webTools(openSandbox),
+      ...handoffTools(passTask),
       computer: computerTool(historyComputer),
-    }),
+    },
     onBoot: () => {
       turn.init({ current: null })
     },
@@ -220,7 +297,19 @@ export const teammateChat = chat
       )
     },
     run: async ({ chatId, messages, tools, signal, streamText }) => {
-      const bot = await findChatContext(chatId)
+      const history = chat.history.all() as TeammateMessage[]
+      const team = await findChatTeam(chatId)
+      const answers = approvalAnswers(messages)
+      const resumed =
+        answers.length > 0 ? await resumeTurn(chatId, answers) : null
+      const bot = await findTeammate(
+        resumed?.botId ??
+          nextTeammate(
+            history.findLast((message) => message.role === "user"),
+            team.bots,
+            team.lastBotId
+          ).id
+      )
       if (!bot) throw new Error("This chat no longer exists.")
       const key = bot.providerKey
       if (!key) {
@@ -231,15 +320,19 @@ export const teammateChat = chat
 
       const model = await modelCatalog.find(key.provider, bot.modelId)
       const canSeeScreen = model?.vision ?? false
-      const answers = approvalAnswers(messages)
-      const resumed =
-        answers.length > 0 ? await resumeTurn(chatId, answers) : null
+      const group = team.bots.length > 1
       const { id: turnId, interrupted } = resumed
         ? { id: resumed.id, interrupted: [] }
         : await startTurn(chatId, bot.id)
       const queueId = `queue-${turnId}`
       const current: Turn = {
         id: turnId,
+        chatId,
+        team: team.bots,
+        userMessageId:
+          history.findLast(
+            (message) => message.role === "user" && !message.metadata?.handoff
+          )?.id ?? "",
         base: resumed?.totals ?? NO_TOTALS,
         judgeUsd: 0,
         risks: new Map(),
@@ -267,6 +360,11 @@ export const teammateChat = chat
         }),
       }
       turn.current = current
+      chat.setUIMessageStreamOptions({
+        onError: (error) =>
+          error instanceof HandoffRejected ? error.message : current.failure,
+        messageMetadata: stamp(resumed ? "resumedAt" : "createdAt", bot.id),
+      })
 
       if (!resumed) {
         const spent = await spentSince(bot.id, new Date(Date.now() - DAY_MS))
@@ -276,7 +374,8 @@ export const teammateChat = chat
         }
       }
 
-      const { computer: genericComputer, ...withoutScreen } = tools
+      const { computer: genericComputer, handoff, ...solo } = tools
+      const withoutScreen = group ? { ...solo, handoff } : solo
       if (canSeeScreen) {
         const execute = computerExecutor({
           desktop: async () => (await openSandbox()).desktop(),
@@ -306,7 +405,13 @@ export const teammateChat = chat
         baseUrl: key.baseUrl,
         apiKey: key.sealedKey ? keyVault.open(key.sealedKey) : undefined,
       }
-      const judgeModelId = key.judgeModelId ?? bot.modelId
+      const judgeModelId =
+        key.judgeModelId ??
+        judgeModelFor(
+          key.provider,
+          await providerModels(key.provider),
+          bot.modelId
+        )
       const judgeModel = models.languageModel(credentials, judgeModelId)
       const judgePrice =
         judgeModelId === bot.modelId
@@ -317,21 +422,27 @@ export const teammateChat = chat
         toolCallId,
         at,
       }))
+      const transcript = group
+        ? await convertToModelMessages(teamView(history, bot.id, team.bots), {
+            tools,
+            ignoreIncompleteToolCalls: true,
+          })
+        : messages
 
       const handBacks: HandBack[] = []
-      chat.setUIMessageStreamOptions({
-        onError: () => current.failure,
-        ...(resumed && { messageMetadata: stamp("resumedAt") }),
-      })
       return streamText({
         model: models.languageModel(credentials, bot.modelId),
-        system: systemPrompt({ ...bot, canSeeScreen }),
+        system: systemPrompt({
+          ...bot,
+          canSeeScreen,
+          team: group ? teamPrompt(bot.id, team.bots) : undefined,
+        }),
         messages: interrupted.length
           ? [
-              ...messages,
+              ...transcript,
               { role: "user", content: interruptedNote(interrupted) },
             ]
-          : messages,
+          : transcript,
         tools: withLedger(
           turnTools,
           toolCallLedger(turnId, (toolCallId) => current.risks.get(toolCallId))
@@ -373,6 +484,7 @@ export const teammateChat = chat
         }),
         abortSignal: signal,
         stopWhen: [
+          () => current.handoff !== undefined,
           ({ steps }) => current.base.stepCount + steps.length >= bot.maxSteps,
           ({ steps }) => turnCostUsd(current, steps) >= bot.taskBudgetUsd,
         ],
@@ -421,7 +533,8 @@ export const teammateChat = chat
         outputTokens: current.base.outputTokens + usage.outputTokens,
         costUsd: turnCostUsd(current, current.steps),
       }
-      if (current.asking && !stopped && !current.failed) {
+      const handoff = stopped || current.failed ? undefined : current.handoff
+      if (current.asking && !handoff && !stopped && !current.failed) {
         await pauseTurn(current.id, totals)
         await current.lease.hold(
           new Date(Date.now() + ANSWER_TIMEOUT_SEC * 1000 + LEASE_TTL_MS)
@@ -431,19 +544,35 @@ export const teammateChat = chat
 
       const reason =
         current.reason ??
-        endReason({
-          stopped,
-          failed: current.failed,
-          finishReason: current.steps.at(-1)?.finishReason,
-          stepCount: totals.stepCount,
-          maxSteps: current.maxSteps,
-          costUsd: totals.costUsd,
-          taskBudgetUsd: current.taskBudgetUsd,
-        })
+        (handoff
+          ? "handoff"
+          : endReason({
+              stopped,
+              failed: current.failed,
+              finishReason: current.steps.at(-1)?.finishReason,
+              stepCount: totals.stepCount,
+              maxSteps: current.maxSteps,
+              costUsd: totals.costUsd,
+              taskBudgetUsd: current.taskBudgetUsd,
+            }))
       const notice = turnNotice(reason, { ...current, steps: totals.stepCount })
       if (notice) writer.write({ type: "data-notice", data: notice })
 
       await finishTurn(current.id, { endReason: reason, ...totals })
       await current.lease.release()
+      if (handoff) {
+        const names = teamNames(current.team)
+        await runtime.send(
+          current.chatId,
+          handoffMessage(
+            handoff.event,
+            {
+              from: names.get(handoff.event.fromBotId) ?? "",
+              to: names.get(handoff.event.toBotId) ?? "",
+            },
+            handoff.at
+          )
+        )
+      }
     },
   })

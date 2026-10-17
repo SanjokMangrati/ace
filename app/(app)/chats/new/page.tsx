@@ -28,7 +28,7 @@ export default async function NewChatPage({
       header={
         <PageHeader
           title="Who should work on this?"
-          description="Pick the teammate for this task."
+          description="Pick one teammate, or a few to work on it together."
         />
       }
     >

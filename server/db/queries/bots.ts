@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   exists,
+  inArray,
   isNotNull,
   isNull,
   not,
@@ -22,7 +23,14 @@ import {
   insertProviderKey,
   type NewProviderKey,
 } from "@/server/db/queries/provider-keys"
-import { bot, botToolPolicy, note, turn } from "@/server/db/schema"
+import {
+  bot,
+  botToolPolicy,
+  chat,
+  chatMember,
+  note,
+  turn,
+} from "@/server/db/schema"
 
 export type BotPicture = { data: Buffer; type: string }
 
@@ -178,9 +186,25 @@ export async function updateBot(
 }
 
 export async function deleteBot(userId: string, id: string) {
-  const rows = await db
-    .delete(bot)
-    .where(and(eq(bot.id, id), eq(bot.userId, userId)))
-    .returning({ id: bot.id })
-  return rows.length > 0
+  return db.transaction(async (tx) => {
+    await tx
+      .delete(chat)
+      .where(
+        and(
+          eq(chat.userId, userId),
+          inArray(
+            chat.id,
+            tx
+              .select({ chatId: chatMember.chatId })
+              .from(chatMember)
+              .where(eq(chatMember.botId, id))
+          )
+        )
+      )
+    const rows = await tx
+      .delete(bot)
+      .where(and(eq(bot.id, id), eq(bot.userId, userId)))
+      .returning({ id: bot.id })
+    return rows.length > 0
+  })
 }

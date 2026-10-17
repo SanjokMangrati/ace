@@ -15,24 +15,30 @@ import { Button } from "@/components/ui/button"
 import { FieldError } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { useAction } from "@/lib/action-client"
+import { nameList } from "@/lib/chat"
 
 export function DeleteChatDialog({
   chatId,
   title,
-  teammateName,
+  teammateNames,
   active,
   open,
   onOpenChange,
 }: {
   chatId: string
   title: string
-  teammateName: string
+  teammateNames: string[]
   active: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
   const { pending, error, run } = useAction()
+  const names = nameList(teammateNames)
+  const keeps =
+    teammateNames.length > 1
+      ? "keep their computers, their files and what they remember"
+      : "keeps its computer, its files and what it remembers"
 
   function confirm() {
     run(
@@ -45,12 +51,10 @@ export function DeleteChatDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent initialFocus={cancelRef}>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            Delete this chat with {teammateName}?
-          </AlertDialogTitle>
+          <AlertDialogTitle>Delete this chat with {names}?</AlertDialogTitle>
           <AlertDialogDescription>
-            “{title}” and its messages will be deleted for good. {teammateName}{" "}
-            keeps its computer, its files and what it remembers.
+            “{title}” and its messages will be deleted for good. {names} {keeps}
+            .
           </AlertDialogDescription>
           {error && <FieldError>{error}</FieldError>}
         </AlertDialogHeader>

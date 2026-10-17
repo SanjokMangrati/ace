@@ -6,8 +6,6 @@ export type MouseButton = "left" | "right" | "middle"
 
 export type ScrollDirection = "up" | "down" | "left" | "right"
 
-type LiveViewMode = "view" | "interact"
-
 export interface Desktop {
   size(): Promise<{ width: number; height: number }>
   screenshot(opts: { scale: number; quality: number }): Promise<Buffer>
@@ -21,7 +19,8 @@ export interface Desktop {
   type(text: string): Promise<void>
   key(combo: string): Promise<void>
   cursor(): Promise<Point>
-  liveView(mode: LiveViewMode, ttlSec: number): Promise<string>
+  open(url: string): Promise<void>
+  liveView(ttlSec: number): Promise<string>
 }
 
 export interface Sandbox {

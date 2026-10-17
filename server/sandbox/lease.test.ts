@@ -1,17 +1,11 @@
-import { PGlite } from "@electric-sql/pglite"
-import { pushSchema } from "drizzle-kit/api"
 import { eq } from "drizzle-orm"
-import { drizzle } from "drizzle-orm/pglite"
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
+import { db } from "@/server/db/client"
 import type { LeaseHolder } from "@/server/db/queries/sandboxes"
 import * as schema from "@/server/db/schema"
+import { sandboxLease } from "./lease"
 
-const db = drizzle({ client: new PGlite(), schema })
-
-vi.mock("server-only", () => ({}))
-vi.mock("@/server/db/client", () => ({ db }))
-
-const { sandboxLease } = await import("./lease")
+vi.mock("@/server/db/client")
 
 let botId: string
 let chatIds: string[]
@@ -52,8 +46,6 @@ async function startTurn(chatIndex: number, runtime = fakeRuntime()) {
 }
 
 beforeAll(async () => {
-  const { apply } = await pushSchema(schema, db as never)
-  await apply()
   await db.insert(schema.user).values({
     id: "user-1",
     name: "Sam",

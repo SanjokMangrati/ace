@@ -1,5 +1,6 @@
 import type { ModelMessage } from "ai"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import type { ComputerAction } from "@/server/ports/computer"
 import type { Desktop } from "@/server/ports/sandbox"
 import {
   computerExecutor,
@@ -7,7 +8,9 @@ import {
   computerModelOutput,
   fitScale,
   OMITTED,
+  PAGE_SETTLE_MS,
   pruneScreenshots,
+  SETTLE_MS,
   toModel,
   toScreen,
   withHandBacks,
@@ -24,17 +27,28 @@ function fakeDesktop(size = { width: 1280, height: 800 }) {
     type: vi.fn(async () => {}),
     key: vi.fn(async (_combo: string) => {}),
     cursor: async () => ({ x: 1280, y: 400 }),
-    liveView: async () => "https://screen.example",
+    open: vi.fn(async (_url: string) => {}),
+    liveView: async () => "wss://screen.example/websockify",
   } satisfies Desktop
 }
 
 function executorFor(desktop: Desktop, note: string | null = null) {
-  return computerExecutor({
+  const execute = computerExecutor({
     desktop: async () => desktop,
     saveScreenshot: async () => "shot-1",
     waitForControl: async () => note,
   })
+  return async (actions: ComputerAction[]) => {
+    vi.useFakeTimers()
+    const pending = execute(actions)
+    await vi.runAllTimersAsync()
+    return pending
+  }
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe("coordinate scaling", () => {
   it("keeps a screen that fits as is", () => {
@@ -53,13 +67,9 @@ describe("coordinate scaling", () => {
 describe("computer executor", () => {
   it("clicks in screen pixels and returns a fresh screenshot", async () => {
     const desktop = fakeDesktop({ width: 2560, height: 1600 })
-    const output = await executorFor(desktop)({
-      type: "click",
-      x: 100,
-      y: 50,
-      button: "left",
-      clicks: 2,
-    })
+    const output = await executorFor(desktop)([
+      { type: "click", x: 100, y: 50, button: "left", clicks: 2 },
+    ])
     expect(desktop.click).toHaveBeenCalledWith(
       { x: 200, y: 100 },
       { button: "left", clicks: 2, modifiers: [] }
@@ -72,7 +82,9 @@ describe("computer executor", () => {
 
   it("presses each key in a sequence, as many times as asked", async () => {
     const desktop = fakeDesktop()
-    await executorFor(desktop)({ type: "key", keys: "Down Return", repeat: 2 })
+    await executorFor(desktop)([
+      { type: "key", keys: "Down Return", repeat: 2 },
+    ])
     expect(desktop.key.mock.calls.map(([combo]) => combo)).toEqual([
       "Down",
       "Return",
@@ -81,23 +93,70 @@ describe("computer executor", () => {
     ])
   })
 
+  it("runs a batch in order, settles once and returns one screenshot", async () => {
+    const desktop = fakeDesktop()
+    const order: string[] = []
+    desktop.click.mockImplementation(async () => {
+      order.push("click")
+    })
+    desktop.type.mockImplementation(async () => {
+      order.push("type")
+    })
+    desktop.key.mockImplementation(async () => {
+      order.push("key")
+    })
+    desktop.screenshot.mockImplementation(async () => {
+      order.push("screenshot")
+      return Buffer.from("jpeg")
+    })
+    vi.useFakeTimers()
+    const pending = computerExecutor({
+      desktop: async () => desktop,
+      saveScreenshot: async () => "shot-1",
+      waitForControl: async () => null,
+    })([
+      { type: "click", x: 1, y: 1, button: "left", clicks: 1 },
+      { type: "type", text: "guitars" },
+      { type: "key", keys: "enter" },
+    ])
+    await vi.advanceTimersByTimeAsync(SETTLE_MS - 1)
+    expect(order).toEqual(["click", "type", "key"])
+    await vi.advanceTimersByTimeAsync(1)
+    await pending
+    expect(order).toEqual(["click", "type", "key", "screenshot"])
+    expect(desktop.screenshot).toHaveBeenCalledTimes(1)
+  })
+
+  it("opens a page and gives it longer to load", async () => {
+    const desktop = fakeDesktop()
+    vi.useFakeTimers()
+    const pending = computerExecutor({
+      desktop: async () => desktop,
+      saveScreenshot: async () => "shot-1",
+      waitForControl: async () => null,
+    })([{ type: "open_url", url: "https://example.com/?q=guitars" }])
+    await vi.advanceTimersByTimeAsync(SETTLE_MS)
+    expect(desktop.open).toHaveBeenCalledWith("https://example.com/?q=guitars")
+    expect(desktop.screenshot).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(PAGE_SETTLE_MS - SETTLE_MS)
+    await pending
+    expect(desktop.screenshot).toHaveBeenCalledTimes(1)
+  })
+
   it("reports the cursor without a screenshot", async () => {
     const desktop = fakeDesktop({ width: 2560, height: 1600 })
     await expect(
-      executorFor(desktop)({ type: "cursor_position" })
+      executorFor(desktop)([{ type: "cursor_position" }])
     ).resolves.toEqual({ cursor: { x: 640, y: 200 } })
     expect(desktop.screenshot).not.toHaveBeenCalled()
   })
 
-  it("skips the action after you had control and shows the screen", async () => {
+  it("skips the actions after you had control and shows the screen", async () => {
     const desktop = fakeDesktop()
     const output = await executorFor(
       desktop,
       "You had control."
-    )({
-      type: "type",
-      text: "hello",
-    })
+    )([{ type: "type", text: "hello" }])
     expect(desktop.type).not.toHaveBeenCalled()
     expect(output.note).toBe("You had control.")
     expect(output.screenshot?.id).toBe("shot-1")
@@ -114,11 +173,29 @@ describe("computer input", () => {
     ).toEqual({ type: "click", x: 10, y: 20, button: "left", clicks: 1 })
   })
 
-  it("refuses points off the screen", () => {
+  it("takes more actions to run right after", () => {
+    const input = computerInputSchema.parse({
+      intent: "Searched for guitars",
+      action: { type: "click", x: 10, y: 20 },
+      andThen: [
+        { type: "type", text: "guitars" },
+        { type: "key", keys: "enter" },
+      ],
+    })
+    expect(input.andThen?.map((action) => action.type)).toEqual(["type", "key"])
+  })
+
+  it("refuses points off the screen and non-web URLs", () => {
     expect(
       computerInputSchema.safeParse({
         intent: "Clicked",
         action: { type: "click", x: 5000, y: 20 },
+      }).success
+    ).toBe(false)
+    expect(
+      computerInputSchema.safeParse({
+        intent: "Opened a file",
+        action: { type: "open_url", url: "file:///etc/passwd" },
       }).success
     ).toBe(false)
   })

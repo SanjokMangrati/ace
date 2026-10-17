@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest"
-import { chatTime, friendlyDate, teammateCount, usd, workedFor } from "./format"
+import {
+  chatTime,
+  friendlyDate,
+  siteOf,
+  teammateCount,
+  usd,
+  workedFor,
+} from "./format"
 
 const now = new Date(2026, 9, 14, 15, 30)
+
+describe("siteOf", () => {
+  it("names the site without www", () => {
+    expect(siteOf("https://www.fender.com/products/strat")).toBe("fender.com")
+    expect(siteOf("not a url")).toBe("not a url")
+  })
+})
 
 describe("friendlyDate", () => {
   it("says Today and Yesterday", () => {

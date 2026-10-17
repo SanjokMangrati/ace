@@ -21,3 +21,16 @@ export function useChatTransport(chatId: string, session?: ChatSession) {
     sessions: session && { [chatId]: session },
   })
 }
+
+export function expectNextTurn(
+  transport: ReturnType<typeof useChatTransport>,
+  chatId: string
+) {
+  const session = transport.getSession(chatId)
+  if (!session) return
+  transport.setSession(chatId, {
+    ...session,
+    isStreaming: true,
+    activeInputSeq: 0,
+  })
+}

@@ -15,7 +15,9 @@ import type { Desktop, Point } from "@/server/ports/sandbox"
 
 export const KEPT_SCREENSHOTS = 3
 export const OMITTED = "[Older screenshot left out to save space.]"
-const SETTLE_MS = 600
+const MAX_BATCH = 10
+export const SETTLE_MS = 2000
+export const PAGE_SETTLE_MS = 4000
 const SCREENSHOT_QUALITY = 70
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -30,6 +32,19 @@ export function toScreen(point: Point, scale: number): Point {
 
 export function toModel(point: Point, scale: number): Point {
   return { x: Math.round(point.x * scale), y: Math.round(point.y * scale) }
+}
+
+function settleFor(action: ComputerAction) {
+  switch (action.type) {
+    case "screenshot":
+    case "cursor_position":
+    case "wait":
+      return 0
+    case "open_url":
+      return PAGE_SETTLE_MS
+    default:
+      return SETTLE_MS
+  }
 }
 
 export function computerExecutor({
@@ -88,43 +103,52 @@ export function computerExecutor({
           clicks: action.clicks,
           modifiers: action.modifiers ?? [],
         })
-        break
+        return
       case "move":
         await desktop.move(await at(action))
-        break
+        return
       case "drag":
         await desktop.drag(
           await at({ x: action.fromX, y: action.fromY }),
           await at(action)
         )
-        break
+        return
       case "scroll":
         await desktop.scroll(await at(action), action.direction, action.amount)
-        break
+        return
       case "type":
         await desktop.type(action.text)
-        break
+        return
       case "key":
         for (let press = 0; press < (action.repeat ?? 1); press++) {
           for (const combo of action.keys.trim().split(/\s+/)) {
             await desktop.key(combo)
           }
         }
-        break
+        return
       case "wait":
         await sleep(action.seconds * 1000)
+        return
+      case "open_url":
+        await desktop.open(action.url)
         return
       case "cursor_position":
         return toModel(await desktop.cursor(), scale)
     }
-    await sleep(SETTLE_MS)
   }
 
-  return async (action: ComputerAction): Promise<ComputerOutput> => {
+  return async (actions: ComputerAction[]): Promise<ComputerOutput> => {
     const note = await waitForControl()
     if (note) return look(note)
-    const cursor = await act(action)
-    return cursor ? { cursor } : look()
+    let cursor: Point | undefined
+    let settle = 0
+    for (const action of actions) {
+      cursor = await act(action)
+      settle = Math.max(settle, settleFor(action))
+    }
+    if (cursor && actions.length === 1) return { cursor }
+    if (settle > 0) await sleep(settle)
+    return look()
   }
 }
 
@@ -164,6 +188,15 @@ const y = z.number().int().min(0).max(SCREEN.height)
 const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("screenshot") }),
   z.object({
+    type: z.literal("open_url"),
+    url: z
+      .url({ protocol: /^https?$/ })
+      .max(2000)
+      .describe(
+        "Opens the page in the browser, starting the browser when it isn't open. Put the search or filter in the URL when you can."
+      ),
+  }),
+  z.object({
     type: z.literal("click"),
     x,
     y,
@@ -197,7 +230,14 @@ const actionSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("wait"),
-    seconds: z.number().min(0.5).max(30).default(2),
+    seconds: z
+      .number()
+      .min(0.5)
+      .max(30)
+      .default(2)
+      .describe(
+        "Only for a page that is still loading in the screenshot. Every call already waits for the screen to settle."
+      ),
   }),
 ])
 
@@ -208,16 +248,24 @@ export const computerInputSchema = z.object({
     .min(1)
     .max(120)
     .describe(
-      "What this does, in plain past-tense words the person sees, like 'Clicked “Export CSV”', 'Typed the email' or 'Looked at the screen'."
+      "What this does, in plain past-tense words the person sees, like 'Opened the Fender product page', 'Clicked “Export CSV”' or 'Typed the email'."
     ),
   action: actionSchema,
+  andThen: z
+    .array(actionSchema)
+    .max(MAX_BATCH - 1)
+    .optional()
+    .describe(
+      "More actions to run right after, in order, when you already know them without seeing the screen in between: typing into a field you just clicked, pressing enter, scrolling a few times. One call with several actions is much faster than one call each."
+    ),
 })
 
 export function computerTool(handlers: ComputerHandlers) {
   return tool({
-    description: `See and use your computer's screen (${SCREEN.width}×${SCREEN.height}). Take a screenshot first, then click, type, press keys or scroll. Every action returns a fresh screenshot. Coordinates are pixels in the latest screenshot.`,
+    description: `See and use your computer's screen (${SCREEN.width}×${SCREEN.height}). open_url goes straight to a page. Click, type, press keys and scroll like a person would; coordinates are pixels in the latest screenshot. Every call waits for the screen to settle and returns one fresh screenshot of the final screen.`,
     inputSchema: computerInputSchema,
-    execute: (input) => handlers.execute(input.action),
+    execute: (input) =>
+      handlers.execute([input.action, ...(input.andThen ?? [])]),
     toModelOutput: ({ output }) => handlers.toModelOutput(output),
   })
 }

@@ -4,18 +4,22 @@ function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
-export function friendlyDate(date: Date, now = new Date()) {
+function dayLabel(date: Date, now: Date, weekday: "long" | "short") {
   const days = Math.round(
     (startOfDay(now).getTime() - startOfDay(date).getTime()) / DAY_MS
   )
   if (days <= 0) return "Today"
   if (days === 1) return "Yesterday"
-  if (days < 7) return date.toLocaleDateString("en-US", { weekday: "long" })
+  if (days < 7) return date.toLocaleDateString("en-US", { weekday })
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     ...(date.getFullYear() !== now.getFullYear() && { year: "numeric" }),
   })
+}
+
+export function friendlyDate(date: Date, now = new Date()) {
+  return dayLabel(date, now, "long")
 }
 
 export function clockTime(date: Date) {
@@ -26,10 +30,8 @@ export function clockTime(date: Date) {
 }
 
 export function chatTime(date: Date, now = new Date()) {
-  const day = friendlyDate(date, now)
-  if (day === "Today") return clockTime(date)
-  if (day === "Yesterday") return day
-  return day.includes(" ") ? day : day.slice(0, 3)
+  const day = dayLabel(date, now, "short")
+  return day === "Today" ? clockTime(date) : day
 }
 
 export function workedFor(ms: number) {
@@ -48,6 +50,10 @@ export function usd(amount: number) {
 
 export function teammateCount(count: number) {
   return `${count} ${count === 1 ? "teammate" : "teammates"}`
+}
+
+export function siteOf(url: string) {
+  return URL.parse(url)?.hostname.replace(/^www\./, "") ?? url
 }
 
 export function teammatePictureUrl(bot: {
