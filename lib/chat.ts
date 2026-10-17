@@ -14,6 +14,13 @@ const TITLE_MAX_LENGTH = 80
 
 export type ControlEvent = { tookAt: number; gaveAt?: number }
 
+export type QueueEvent = {
+  chatId: string
+  title: string
+  waitingOn: "work" | "you"
+  startedAt?: number
+}
+
 type MessageMetadata = {
   createdAt?: number
   finishedAt?: number
@@ -32,7 +39,7 @@ type ComputerUITool = {
 
 export type TeammateMessage = UIMessage<
   MessageMetadata,
-  { notice: TurnNotice; control: ControlEvent },
+  { notice: TurnNotice; control: ControlEvent; queue: QueueEvent },
   InferUITools<NoteTools & SandboxTools> & { computer: ComputerUITool }
 >
 

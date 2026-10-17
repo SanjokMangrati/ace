@@ -1,10 +1,45 @@
-import { HourglassIcon, InfoIcon } from "@phosphor-icons/react/ssr"
+import {
+  HandPalmIcon,
+  HourglassIcon,
+  HourglassMediumIcon,
+  InfoIcon,
+} from "@phosphor-icons/react/ssr"
 import Link from "next/link"
 import { ErrorNotice } from "@/components/app/error-notice"
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
-import type { TurnNotice as Notice } from "@/lib/chat"
+import type { TurnNotice as Notice, QueueEvent } from "@/lib/chat"
 import { usd } from "@/lib/format"
+
+export function UpNextNotice({
+  queue,
+  name,
+}: {
+  queue: QueueEvent
+  name: string
+}) {
+  if (queue.waitingOn === "you") {
+    return (
+      <Alert variant="needs-you">
+        <HandPalmIcon weight="duotone" />
+        <AlertDescription>
+          {name} is waiting for you to give back control in{" "}
+          <Link href={`/chats/${queue.chatId}`}>{queue.title}</Link>.
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  return (
+    <Alert>
+      <HourglassMediumIcon weight="duotone" />
+      <AlertDescription>
+        {name} is finishing <b>{queue.title}</b> first. It'll start on this
+        right after.
+      </AlertDescription>
+    </Alert>
+  )
+}
 
 export function TurnNotice({
   notice,

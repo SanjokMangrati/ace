@@ -29,10 +29,10 @@ import {
   saveSandbox,
   takeControl,
 } from "@/server/db/queries/sandboxes"
+import { TAKEOVER_TIMEOUT_SEC, wakeBotWaiters } from "@/server/sandbox/lease"
 import { requireUser } from "@/server/session"
 
 const LIVE_VIEW_TTL_SEC = 30 * 60
-const TAKEOVER_TIMEOUT_SEC = 24 * 60 * 60
 
 export async function createChat(
   values: NewChatInput
@@ -131,6 +131,7 @@ export async function deleteChat(
   if (takeover?.waitRef) await chatRuntime.completeWait(takeover.waitRef)
   await chatRuntime.closeSession(id, "chat deleted")
   await deleteChatRow(userId, id)
+  await wakeBotWaiters(chatRuntime, botId)
   revalidatePath("/", "layout")
   if (leave) redirect("/")
   return { ok: true }

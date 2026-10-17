@@ -49,6 +49,7 @@ export type SidebarChat = {
   title: string
   updatedAt: Date
   working: boolean
+  queued: boolean
   inControl: boolean
   teammate: { id: string; name: string; picture: string | null }
 }
@@ -100,12 +101,18 @@ function YouAvatar({ user }: { user: AuthUser }) {
   )
 }
 
+type LiveStatus = { working: boolean; queued: boolean }
+
+function liveStatus(chat: SidebarChat, live: ReturnType<typeof useLiveChat>) {
+  return live?.id === chat.id ? live : chat
+}
+
 function ChatStatus({
   chat,
-  working,
+  status,
 }: {
   chat: SidebarChat
-  working: boolean
+  status: LiveStatus
 }) {
   if (chat.inControl) {
     return (
@@ -115,7 +122,14 @@ function ChatStatus({
       </span>
     )
   }
-  if (working) {
+  if (status.queued) {
+    return (
+      <span className="text-caption text-ink-3 group-aria-[current=page]/row:text-ink-2">
+        Up next
+      </span>
+    )
+  }
+  if (status.working) {
     return (
       <span className="inline-flex items-center gap-1.5 text-caption font-medium text-working">
         <StatusDot tone="working" className="size-1.75" />
@@ -137,12 +151,12 @@ function ChatStatus({
 function ChatRow({
   chat,
   active,
-  working,
+  status,
   onNavigate,
 }: {
   chat: SidebarChat
   active: boolean
-  working: boolean
+  status: LiveStatus
   onNavigate?: () => void
 }) {
   const [deleting, setDeleting] = useState(false)
@@ -169,7 +183,7 @@ function ChatRow({
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate">{chat.title}</span>
-          <ChatStatus chat={chat} working={working} />
+          <ChatStatus chat={chat} status={status} />
         </span>
       </Link>
       <DropdownMenu>
@@ -319,12 +333,7 @@ function SidebarRail({
                   />
                   <span className="flex min-w-0 flex-1 flex-col gap-px">
                     <span className="truncate text-small">{chat.title}</span>
-                    <ChatStatus
-                      chat={chat}
-                      working={
-                        live?.id === chat.id ? live.working : chat.working
-                      }
-                    />
+                    <ChatStatus chat={chat} status={liveStatus(chat, live)} />
                   </span>
                 </DropdownMenuLinkItem>
               ))
@@ -438,7 +447,7 @@ export function AppSidebar({
             key={chat.id}
             chat={chat}
             active={pathname === `/chats/${chat.id}`}
-            working={live?.id === chat.id ? live.working : chat.working}
+            status={liveStatus(chat, live)}
             onNavigate={onNavigate}
           />
         ))
