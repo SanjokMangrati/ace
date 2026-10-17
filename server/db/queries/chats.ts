@@ -7,6 +7,7 @@ import {
   exists,
   gt,
   gte,
+  inArray,
   isNotNull,
   isNull,
   sql,
@@ -21,6 +22,7 @@ import {
   type RuntimeCursors,
   sandbox,
   sandboxWaiter,
+  toolCall,
   turn,
   type turnEndReason,
 } from "@/server/db/schema"
@@ -295,12 +297,55 @@ export async function saveTranscript(
   })
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function endOpenTurns(tx: Tx, chatId: string) {
+  const ended = await tx
+    .update(turn)
+    .set({ endReason: "error", endedAt: new Date() })
+    .where(and(eq(turn.chatId, chatId), isNull(turn.endedAt)))
+    .returning({ id: turn.id, botId: turn.botId })
+  if (ended.length > 0) {
+    await tx
+      .update(toolCall)
+      .set({ status: "interrupted", finishedAt: new Date() })
+      .where(
+        and(
+          inArray(
+            toolCall.turnId,
+            ended.map((row) => row.id)
+          ),
+          eq(toolCall.status, "started")
+        )
+      )
+  }
+  return ended
+}
+
+async function interruptedCalls(tx: Tx, chatId: string) {
+  const [last] = await tx
+    .select({ id: turn.id })
+    .from(turn)
+    .where(eq(turn.chatId, chatId))
+    .orderBy(desc(turn.startedAt))
+    .limit(1)
+  if (!last) return []
+  const calls = await tx
+    .select({
+      toolName: toolCall.toolName,
+      input: toolCall.input,
+      status: toolCall.status,
+    })
+    .from(toolCall)
+    .where(eq(toolCall.turnId, last.id))
+    .orderBy(toolCall.startedAt)
+  return calls.some((call) => call.status === "interrupted") ? calls : []
+}
+
 export async function startTurn(chatId: string, botId: string) {
   return db.transaction(async (tx) => {
-    await tx
-      .update(turn)
-      .set({ endReason: "error", endedAt: new Date() })
-      .where(and(eq(turn.chatId, chatId), isNull(turn.endedAt)))
+    await endOpenTurns(tx, chatId)
+    const interrupted = await interruptedCalls(tx, chatId)
     await tx
       .update(chat)
       .set({ updatedAt: new Date() })
@@ -309,7 +354,7 @@ export async function startTurn(chatId: string, botId: string) {
       .insert(turn)
       .values({ chatId, botId })
       .returning({ id: turn.id })
-    return row.id
+    return { id: row.id, interrupted }
   })
 }
 
@@ -330,11 +375,7 @@ export async function finishTurn(
 }
 
 export async function endRunningTurns(chatId: string) {
-  return db
-    .update(turn)
-    .set({ endReason: "error", endedAt: new Date() })
-    .where(and(eq(turn.chatId, chatId), isNull(turn.endedAt)))
-    .returning({ id: turn.id, botId: turn.botId })
+  return db.transaction((tx) => endOpenTurns(tx, chatId))
 }
 
 export async function spentSince(botId: string, since: Date) {

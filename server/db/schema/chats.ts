@@ -101,6 +101,31 @@ export const turn = pgTable(
   ]
 )
 
+export const toolCallStatus = pgEnum("tool_call_status", [
+  "started",
+  "finished",
+  "failed",
+  "interrupted",
+])
+
+export const toolCall = pgTable(
+  "tool_call",
+  {
+    turnId: uuid("turn_id")
+      .notNull()
+      .references(() => turn.id, { onDelete: "cascade" }),
+    toolCallId: text("tool_call_id").notNull(),
+    toolName: text("tool_name").notNull(),
+    input: jsonb("input"),
+    status: toolCallStatus("status").default("started").notNull(),
+    output: jsonb("output"),
+    error: text("error"),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    finishedAt: timestamp("finished_at"),
+  },
+  (table) => [primaryKey({ columns: [table.turnId, table.toolCallId] })]
+)
+
 export const screenshot = pgTable(
   "screenshot",
   {
