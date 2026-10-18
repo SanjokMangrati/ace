@@ -15,6 +15,7 @@ USER_AGENT = (
 RESULT_LIMIT = 8
 FETCH_TIMEOUT_SEC = 40
 BLOCKED_TITLES = ("just a moment", "access denied", "attention required")
+COMMON_WORDS = {"the", "and", "for", "with", "what", "how", "who", "are", "was", "from", "that", "this", "about", "into"}
 
 
 def fail(message):
@@ -44,6 +45,18 @@ def results_from(items):
         if len(results) == RESULT_LIMIT:
             break
     return results
+
+
+def words(text):
+    return {word for word in re.findall(r"\w+", text.lower()) if len(word) > 2 and word not in COMMON_WORDS}
+
+
+def on_topic(results, query):
+    wanted = words(query)
+    if not wanted:
+        return results
+    kept = [r for r in results if wanted & words(f"{r['title']} {r['snippet']} {r['url']}")]
+    return kept if len(kept) * 2 >= len(results) else []
 
 
 def uddg_target(href):
@@ -118,7 +131,7 @@ def search(query):
     results = []
     for engine in (duckduckgo, duckduckgo_lite, bing, duckduckgo_rendered):
         try:
-            results = engine(query)
+            results = on_topic(engine(query), query)
         except Exception:
             results = []
         if results:

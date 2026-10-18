@@ -1,6 +1,6 @@
 "use client"
 
-import { useChat } from "@ai-sdk/react"
+import { Chat, useChat } from "@ai-sdk/react"
 import {
   ArrowUpIcon,
   AtIcon,
@@ -23,11 +23,15 @@ import {
   useSyncExternalStore,
 } from "react"
 import { useDefaultLayout } from "react-resizable-panels"
+import { changeChatModel } from "@/app/(app)/chats/actions"
 import {
   Conversation,
   ConversationContent,
 } from "@/components/ai-elements/conversation"
-import { useReportLiveChat } from "@/components/app/live-chat"
+import {
+  useForgetLiveChat,
+  useReportLiveChat,
+} from "@/components/app/live-chat"
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
 import { AvatarGroup, TeammateAvatar } from "@/components/ui/avatar"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -46,13 +50,16 @@ import { Status } from "@/components/ui/status"
 import { SOMETHING_WENT_WRONG } from "@/lib/action-result"
 import {
   type ControlEvent,
+  controlMessage,
   handoffMessage,
   mentionedTeammate,
   nameList,
   nextTeammate,
   type TeammateMessage,
 } from "@/lib/chat"
+import type { ProviderKeyModels } from "@/lib/provider-display"
 import { type ChatTeammate, TeammateReply, YourMessage } from "./chat-message"
+import { type ChatModel, ModelPicker } from "./model-picker"
 import { takePendingMessage } from "./pending-message"
 import { ScreenPanel } from "./screen-panel"
 import {
@@ -130,22 +137,51 @@ export function ChatView({
   controlBotId,
   initialMessages,
   session,
+  providerKeys,
 }: {
   chatId: string
   title: string
-  teammates: ChatTeammate[]
+  teammates: (ChatTeammate & { model: ChatModel })[]
   lastBotId: string | null
   controlBotId: string | null
   initialMessages: TeammateMessage[]
   session: ChatSession | undefined
+  providerKeys: ProviderKeyModels[]
 }) {
   const router = useRouter()
   const transport = useChatTransport(chatId, session)
   const [resume] = useState(initialMessages.length > 0)
   const [failures, setFailures] = useState<Record<string, string>>({})
+  const [answeredAt, setAnsweredAt] = useState<Record<string, number>>({})
   const [handedOn, setHandedOn] = useState<TeammateMessage>()
   const [draft, setDraft] = useState("")
   const lastFailure = useRef(SOMETHING_WENT_WRONG)
+  const shown = useRef(true)
+  const forgetLive = useForgetLiveChat()
+  const [conversation] = useState(
+    () =>
+      new Chat<TeammateMessage>({
+        id: chatId,
+        messages: initialMessages,
+        transport,
+        sendAutomaticallyWhen:
+          lastAssistantMessageIsCompleteWithApprovalResponses,
+        onError: (failure) => {
+          lastFailure.current = failure.message || SOMETHING_WENT_WRONG
+        },
+        onFinish: ({ message, isError }) => {
+          if (isError && message.role === "assistant") {
+            setFailures((current) => ({
+              ...current,
+              [message.id]: lastFailure.current,
+            }))
+          }
+          if (!isError && passedOn(message)) setHandedOn(message)
+          if (!shown.current) forgetLive(chatId)
+          router.refresh()
+        },
+      })
+  )
   const {
     messages,
     sendMessage,
@@ -154,26 +190,7 @@ export function ChatView({
     status,
     error,
     addToolApprovalResponse,
-  } = useChat<TeammateMessage>({
-    id: chatId,
-    messages: initialMessages,
-    transport,
-    resume,
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-    onError: (failure) => {
-      lastFailure.current = failure.message || SOMETHING_WENT_WRONG
-    },
-    onFinish: ({ message, isError }) => {
-      if (isError && message.role === "assistant") {
-        setFailures((current) => ({
-          ...current,
-          [message.id]: lastFailure.current,
-        }))
-      }
-      if (!isError && passedOn(message)) setHandedOn(message)
-      router.refresh()
-    },
-  })
+  } = useChat({ chat: conversation })
   const inControl = controlBotId !== null
   const [screenOpen, setScreenOpen] = useState(inControl)
   const [fullSize, setFullSize] = useState(false)
@@ -222,12 +239,19 @@ export function ChatView({
   const canSend = nextUp.connected && !working && !inControl && !needsYou
   useReportLiveChat(chatId, { working, queued, needsYou })
 
+  useEffect(() => {
+    shown.current = true
+    return () => {
+      shown.current = false
+    }
+  }, [])
+
   const followHandoff = useEffectEvent((message: TeammateMessage) => {
     const passed = passedOn(message)
     const from = byId(message.metadata?.botId)
     if (!passed || !from) return
-    setMessages((shown) => [
-      ...shown,
+    setMessages((current) => [
+      ...current,
       handoffMessage(
         { id: passed.output.id, fromBotId: from.id, ...passed.input },
         { from: from.name, to: passed.output.name },
@@ -248,11 +272,15 @@ export function ChatView({
     sendMessage({ text, metadata: { createdAt: Date.now() } })
   }
 
-  function handedBack(control: ControlEvent) {
-    sendMessage({
-      text: "I'm done with your screen and gave you back control. Look at it again, then carry on.",
-      metadata: { createdAt: Date.now(), control },
+  async function handedBack(control: Required<ControlEvent>) {
+    const messageId = crypto.randomUUID()
+    setMessages((current) => [...current, controlMessage(messageId, control)])
+    const applied = await transport.sendAction(chatId, {
+      type: "gave-back-control",
+      messageId,
+      control,
     })
+    await applied.pipeTo(new WritableStream())
   }
 
   const sendPending = useEffectEvent(() => {
@@ -264,6 +292,16 @@ export function ChatView({
     const timer = setTimeout(sendPending)
     return () => clearTimeout(timer)
   }, [])
+
+  const resumeOnMount = useEffectEvent(() => {
+    resumeStream()
+  })
+
+  useEffect(() => {
+    if (!resume) return
+    const timer = setTimeout(resumeOnMount)
+    return () => clearTimeout(timer)
+  }, [resume])
 
   useEffect(() => {
     if (!fullSize) return
@@ -294,6 +332,7 @@ export function ChatView({
                 message={message}
                 working={working && index === messages.length - 1}
                 error={failures[message.id]}
+                answeredAt={answeredAt}
                 onKeepGoing={
                   index === messages.length - 1 && canSend
                     ? () => send("Keep going")
@@ -301,8 +340,13 @@ export function ChatView({
                 }
                 onAnswer={
                   index === messages.length - 1 && needsYou
-                    ? (id, approved) =>
+                    ? (id, approved) => {
+                        setAnsweredAt((times) => ({
+                          ...times,
+                          [id]: Date.now(),
+                        }))
                         addToolApprovalResponse({ id, approved })
+                      }
                     : undefined
                 }
               />
@@ -384,6 +428,15 @@ export function ChatView({
                     )
                   )}
                 </ComposerHint>
+                {providerKeys.length > 0 && (
+                  <ModelPicker
+                    teammate={nextUp}
+                    providerKeys={providerKeys}
+                    onPick={(model) =>
+                      changeChatModel({ chatId, botId: nextUp.id, ...model })
+                    }
+                  />
+                )}
                 <Button
                   type="submit"
                   size="icon-sm"

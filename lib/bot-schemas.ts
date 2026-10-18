@@ -1,5 +1,6 @@
 import { createInsertSchema } from "drizzle-zod"
 import { z } from "zod"
+import { MODEL_ID_MAX_LENGTH, MODEL_ID_TOO_LONG } from "@/lib/models"
 import {
   checkProviderKey,
   providerKeyFieldsSchema,
@@ -26,6 +27,8 @@ export const TEAMMATE_NOT_FOUND =
   "We couldn't find this teammate. It may have been deleted."
 
 const PICK_PROVIDER_MESSAGE = "Pick an AI provider."
+export const PICK_SAVED_PROVIDER = "Pick one of your AI providers."
+export const PICK_LISTED_MODEL = "Pick a model from the list."
 
 export const TOOL_GROUPS = toolGroup.enumValues
 
@@ -79,6 +82,13 @@ export function cappedLimits(
   }
 }
 
+export function modelIdSchema(schema: z.ZodString) {
+  return schema
+    .trim()
+    .min(1, "Pick a model.")
+    .max(MODEL_ID_MAX_LENGTH, MODEL_ID_TOO_LONG)
+}
+
 function budget(label: string, maxUsd: number) {
   return z
     .number({ error: `Enter an amount for ${label}, like 1.00.` })
@@ -111,11 +121,7 @@ export function botFormSchema(caps = LIMIT_CEILINGS) {
           BOT_INSTRUCTIONS_MAX_LENGTH,
           `Keep the instructions to ${BOT_INSTRUCTIONS_MAX_LENGTH} characters or fewer.`
         ),
-    modelId: (schema) =>
-      schema
-        .trim()
-        .min(1, "Pick a model.")
-        .max(200, "That model name is too long."),
+    modelId: modelIdSchema,
     maxSteps: () =>
       z
         .number({ error: "Enter a number of steps, like 50." })

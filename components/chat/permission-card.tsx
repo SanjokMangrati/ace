@@ -148,7 +148,7 @@ export function PermissionCard({
       aria-label={`${name} is asking for permission`}
       className="gap-0 py-0"
     >
-      <div className="flex flex-col gap-3 px-5 py-4.5">
+      <div className="flex flex-col gap-3 px-4 py-3.5">
         <div className="flex items-start gap-3">
           <span className="grid size-9.5 shrink-0 place-items-center rounded-md bg-needs-you-soft text-needs-you">
             <Icon weight="duotone" className="size-4.5" />
@@ -178,7 +178,7 @@ export function PermissionCard({
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2 px-5 pb-4.5">
+      <div className="flex flex-wrap items-center justify-end gap-2 px-4 pb-3.5">
         {ask.careful ? (
           <>
             {fullAuto && (

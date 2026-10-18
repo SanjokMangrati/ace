@@ -43,7 +43,7 @@ import { chatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { AuthUser } from "@/server/ports/auth"
 import { DeleteChatDialog } from "./delete-chat"
-import { type LiveStatus, useLiveChat } from "./live-chat"
+import { type LiveStatus, useLiveChats } from "./live-chat"
 
 export type SidebarChat = {
   id: string
@@ -121,8 +121,30 @@ function YouAvatar({ user }: { user: AuthUser }) {
   )
 }
 
-function liveStatus(chat: SidebarChat, live: ReturnType<typeof useLiveChat>) {
-  return live?.id === chat.id ? live : chat
+const statusLineColors = {
+  "needs-you": "text-needs-you",
+  control: "text-control",
+  working: "text-working",
+}
+
+function StatusLine({
+  tone,
+  children,
+}: {
+  tone: keyof typeof statusLineColors
+  children: React.ReactNode
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-caption font-medium",
+        statusLineColors[tone]
+      )}
+    >
+      <StatusDot tone={tone} className="size-1.75" />
+      {children}
+    </span>
+  )
 }
 
 function ChatStatus({
@@ -133,20 +155,10 @@ function ChatStatus({
   status: LiveStatus
 }) {
   if (status.needsYou) {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-caption font-medium text-needs-you">
-        <StatusDot tone="needs-you" className="size-1.75" />
-        Needs you
-      </span>
-    )
+    return <StatusLine tone="needs-you">Needs you</StatusLine>
   }
   if (chat.inControl) {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-caption font-medium text-control">
-        <StatusDot tone="control" className="size-1.75" />
-        You're in control
-      </span>
-    )
+    return <StatusLine tone="control">You're in control</StatusLine>
   }
   if (status.queued) {
     return (
@@ -155,14 +167,7 @@ function ChatStatus({
       </span>
     )
   }
-  if (status.working) {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-caption font-medium text-working">
-        <StatusDot tone="working" className="size-1.75" />
-        Working
-      </span>
-    )
-  }
+  if (status.working) return <StatusLine tone="working">Working</StatusLine>
   return (
     <time
       dateTime={chat.updatedAt.toISOString()}
@@ -269,7 +274,7 @@ function SidebarRail({
   onExpand: () => void
 }) {
   const pathname = usePathname()
-  const live = useLiveChat()
+  const live = useLiveChats()
   const { signingOut, signOut } = useSignOut()
   const chatOpen = chats.some((chat) => pathname === `/chats/${chat.id}`)
 
@@ -349,7 +354,7 @@ function SidebarRail({
                   <ChatAvatars chat={chat} />
                   <span className="flex min-w-0 flex-1 flex-col gap-px">
                     <span className="truncate text-small">{chat.title}</span>
-                    <ChatStatus chat={chat} status={liveStatus(chat, live)} />
+                    <ChatStatus chat={chat} status={live[chat.id] ?? chat} />
                   </span>
                 </DropdownMenuLinkItem>
               ))
@@ -404,7 +409,7 @@ export function AppSidebar({
   onExpand?: () => void
 }) {
   const pathname = usePathname()
-  const live = useLiveChat()
+  const live = useLiveChats()
   const { signingOut, signOut } = useSignOut()
 
   if (collapsed && onExpand) {
@@ -463,7 +468,7 @@ export function AppSidebar({
             key={chat.id}
             chat={chat}
             active={pathname === `/chats/${chat.id}`}
-            status={liveStatus(chat, live)}
+            status={live[chat.id] ?? chat}
             onNavigate={onNavigate}
           />
         ))

@@ -14,7 +14,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core"
 import { user } from "./auth"
-import { bot } from "./bots"
+import { bot, providerKey } from "./bots"
 
 export const turnEndReason = pgEnum("turn_end_reason", [
   "done",
@@ -62,10 +62,15 @@ export const chatMember = pgTable(
       .notNull()
       .references(() => bot.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
+    providerKeyId: uuid("provider_key_id").references(() => providerKey.id, {
+      onDelete: "set null",
+    }),
+    modelId: text("model_id"),
   },
   (table) => [
     primaryKey({ columns: [table.chatId, table.botId] }),
     index("chat_member_botId_idx").on(table.botId),
+    index("chat_member_providerKeyId_idx").on(table.providerKeyId),
   ]
 )
 

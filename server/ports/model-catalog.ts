@@ -5,3 +5,9 @@ export interface ModelCatalog {
   list(provider: Provider): Promise<CatalogModel[]>
   find(provider: Provider, modelId: string): Promise<CatalogModel | undefined>
 }
+
+type ModelServer = { baseUrl: string; apiKey: string | undefined }
+
+export interface ServerModelCatalog {
+  list(server: ModelServer): Promise<CatalogModel[]>
+}

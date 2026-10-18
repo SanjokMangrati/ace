@@ -4,6 +4,9 @@ export const PROVIDERS = providerKind.enumValues
 
 export type Provider = (typeof PROVIDERS)[number]
 
+export const MODEL_ID_MAX_LENGTH = 200
+export const MODEL_ID_TOO_LONG = "That model name is too long."
+
 export type CatalogModel = {
   id: string
   label: string

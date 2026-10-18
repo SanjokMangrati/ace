@@ -8,7 +8,7 @@ function Composer({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="composer"
       className={cn(
-        "flex flex-col gap-2 rounded-lg bg-surface pt-3.5 pr-3.5 pb-2.5 pl-4.5 shadow-card ring-1 ring-line focus-within:ring-2 focus-within:ring-ring",
+        "flex flex-col gap-2 rounded-lg bg-surface pt-3 pr-3 pb-2.5 pl-4 shadow-card ring-1 ring-line focus-within:ring-2 focus-within:ring-ring",
         className
       )}
       {...props}

@@ -141,6 +141,53 @@ describe("TeammateReply asking for permission", () => {
     ).toBeTruthy()
   })
 
+  it("says how long it worked before asking", () => {
+    const minute = 60_000
+    const message = asking({})
+    message.parts.unshift({ type: "reasoning", text: "", state: "done" })
+    render(
+      <TeammateReply
+        teammate={teammate}
+        team={[teammate]}
+        message={{
+          ...message,
+          metadata: { createdAt: 0, finishedAt: 3 * minute },
+        }}
+        working={false}
+        onAnswer={() => {}}
+      />
+    )
+    expect(screen.getByText("Worked for 3 minutes")).toBeTruthy()
+  })
+
+  it("keeps the time it worked before asking once you answered", () => {
+    const minute = 60_000
+    const message = asking({ approved: true }, "approval-responded")
+    message.parts.unshift({ type: "reasoning", text: "", state: "done" })
+    message.parts.push({
+      type: "data-answer",
+      id: "answer-c1",
+      data: { toolCallId: "c1", at: 10 * minute, askedAt: 2 * minute },
+    })
+    render(
+      <TeammateReply
+        teammate={teammate}
+        team={[teammate]}
+        message={{
+          ...message,
+          metadata: {
+            createdAt: 0,
+            resumedAt: 10 * minute,
+            finishedAt: 15 * minute,
+          },
+        }}
+        working={false}
+      />
+    )
+    expect(screen.getByText("Worked for 2 minutes")).toBeTruthy()
+    expect(screen.getByText("Worked for 5 minutes")).toBeTruthy()
+  })
+
   it("shrinks to one line once answered and carries on below it", () => {
     render(
       <TeammateReply

@@ -21,7 +21,7 @@ function PickCard({
       data-slot="pick-card"
       aria-pressed={pressed}
       className={cn(
-        "group/pick flex w-full cursor-pointer items-center gap-3.5 rounded-md bg-surface p-4 text-left text-ink shadow-card transition duration-150 ease-out hover:not-aria-pressed:bg-fill aria-pressed:bg-sun-soft aria-pressed:shadow-none aria-pressed:ring-2 aria-pressed:ring-ink",
+        "group/pick flex w-full cursor-pointer items-center gap-3 rounded-md bg-surface px-3.5 py-3 text-left text-ink shadow-card transition duration-150 ease-out hover:not-aria-pressed:bg-fill aria-pressed:bg-sun-soft aria-pressed:shadow-none aria-pressed:ring-2 aria-pressed:ring-ink",
         className
       )}
       {...props}
@@ -37,11 +37,11 @@ function PickCard({
       </span>
       <span
         aria-hidden
-        className="grid size-6 shrink-0 place-items-center rounded-full border-1.5 border-input text-on-sun group-aria-pressed/pick:border-on-sun group-aria-pressed/pick:bg-sun"
+        className="grid size-5 shrink-0 place-items-center rounded-full border-1.5 border-input text-on-sun group-aria-pressed/pick:border-on-sun group-aria-pressed/pick:bg-sun"
       >
         <CheckIcon
           weight="regular"
-          className="size-3.5 opacity-0 group-aria-pressed/pick:opacity-100"
+          className="size-3 opacity-0 group-aria-pressed/pick:opacity-100"
         />
       </span>
     </button>

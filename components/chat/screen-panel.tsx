@@ -154,7 +154,7 @@ export function ScreenPanel({
   inControl: boolean
   working: boolean
   expanded: boolean
-  onHandedBack: (control: ControlEvent) => void
+  onHandedBack: (control: Required<ControlEvent>) => void
   onToggleSize?: () => void
   onClose: () => void
 }) {
@@ -263,7 +263,9 @@ export function ScreenPanel({
           <p className="px-4 py-2.5 text-caption text-ink-3">
             {inControl
               ? `Your clicks and typing go to ${name}'s screen. ${name} stays paused until you give back control.`
-              : `Watching only. ${name} is using the screen.`}
+              : working
+                ? `Watching only. ${name} is using the screen.`
+                : "Watching only."}
           </p>
         </section>
       </div>

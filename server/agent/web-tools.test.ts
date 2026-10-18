@@ -43,6 +43,16 @@ describe("parseWebOutput", () => {
       )
     ).toThrow("Couldn't read that page. This site blocks automated reading.")
   })
+
+  it("turns output that isn't JSON into a tool error", () => {
+    expect(() =>
+      parseWebOutput(
+        schema,
+        { exitCode: 0, output: "Traceback: out of memory" },
+        "Couldn't read that page."
+      )
+    ).toThrow("Couldn't read that page. Traceback: out of memory")
+  })
 })
 
 describe("webTools", () => {

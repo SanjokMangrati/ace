@@ -28,7 +28,8 @@ export function UpNextNotice({
           {queue.waitingOn === "control"
             ? "you to give back control"
             : "your answer"}{" "}
-          in {chat}.
+          in {chat}
+          {/[.!?…]$/.test(queue.title) ? "" : "."}
         </AlertDescription>
       </Alert>
     )
@@ -60,7 +61,7 @@ export function TurnNotice({
 
   const changeLimit = (label: string) => (
     <Link
-      href={settingsHref}
+      href={`${settingsHref}?show=limits`}
       className={buttonVariants({ variant: "ghost", size: "sm" })}
     >
       {label}
@@ -73,7 +74,8 @@ export function TurnNotice({
         <InfoIcon weight="duotone" />
         <AlertDescription>
           <b>
-            {name} stopped after {notice.steps} steps
+            {name} stopped after {notice.steps}{" "}
+            {notice.steps === 1 ? "step" : "steps"}
           </b>{" "}
           so it doesn't run on forever.
         </AlertDescription>

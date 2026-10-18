@@ -45,7 +45,7 @@ function DialogContent({
                 variant="ghost"
                 size="icon-sm"
                 aria-label="Close"
-                className="absolute top-4 right-4"
+                className="absolute top-3 right-3"
               />
             }
           >
@@ -62,7 +62,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-header"
       className={cn(
-        "flex shrink-0 flex-col gap-1.5 border-b border-line py-5 pr-16 pl-4 sm:pl-6",
+        "flex shrink-0 flex-col gap-1.5 border-b border-line py-3.5 pr-14 pl-4 sm:pl-5",
         className
       )}
       {...props}
@@ -75,7 +75,7 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-body"
       className={cn(
-        "min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-6 scrollbar-main sm:px-6",
+        "min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-5 scrollbar-main sm:px-5",
         className
       )}
       {...props}
@@ -88,7 +88,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-4 sm:px-6",
+        "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-3 sm:px-5",
         className
       )}
       {...props}

@@ -21,9 +21,9 @@ export function TeammateCard({
   const href = `/teammates/${id}`
 
   return (
-    <article className="relative flex min-w-0 flex-col gap-4 rounded-md bg-surface p-5 shadow-card">
-      <div className="flex min-w-0 items-center gap-3.5">
-        <TeammateAvatar botId={id} name={name} picture={picture} size="lg" />
+    <article className="relative flex min-w-0 flex-col gap-3 rounded-md bg-surface p-4 shadow-card">
+      <div className="flex min-w-0 items-center gap-3">
+        <TeammateAvatar botId={id} name={name} picture={picture} size="md" />
         <div className="min-w-0">
           <h2 className="font-display text-name-lg">
             <Link

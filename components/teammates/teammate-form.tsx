@@ -82,6 +82,7 @@ export function TeammateForm({
   models,
   allowCustom,
   limits,
+  showAdvanced = false,
   children,
 }: {
   mode: "create" | "edit"
@@ -93,6 +94,7 @@ export function TeammateForm({
   models: ProviderModels
   allowCustom: boolean
   limits: TeammateLimits
+  showAdvanced?: boolean
   children?: React.ReactNode
 }) {
   const closeModal = useCloseModal()
@@ -104,7 +106,7 @@ export function TeammateForm({
     resolver,
     defaultValues,
   })
-  const [advanced, setAdvanced] = useState<string[]>([])
+  const [advanced, setAdvanced] = useState(showAdvanced ? [ADVANCED] : [])
   const [pictureFile, setPictureFile] = useState<File | null>(null)
   const [pictureRemoved, setPictureRemoved] = useState(false)
   const [pictureError, setPictureError] = useState<string | null>(null)
@@ -242,8 +244,8 @@ export function TeammateForm({
 
   return (
     <>
-      <DialogHeader className="flex-row items-center gap-4">
-        <TeammateAvatar botId={botId} name={name} picture={picture} size="lg" />
+      <DialogHeader className="flex-row items-center gap-3">
+        <TeammateAvatar botId={botId} name={name} picture={picture} size="md" />
         <div className="min-w-0">
           <DialogTitle id="teammate-title" className="truncate">
             {displayName || "New teammate"}
@@ -255,13 +257,13 @@ export function TeammateForm({
           )}
         </div>
       </DialogHeader>
-      <DialogBody className="flex flex-col gap-6">
+      <DialogBody className="flex flex-col gap-5">
         <form
           id={FORM_ID}
           onSubmit={form.handleSubmit(onSubmit, onInvalid)}
           noValidate
           aria-labelledby="teammate-title"
-          className="flex flex-col gap-6"
+          className="flex flex-col gap-5"
         >
           <FormError control={form.control} />
 
@@ -272,7 +274,7 @@ export function TeammateForm({
           )}
 
           <Section id="s-profile" title="Profile">
-            <Card className="gap-4 px-4">
+            <Card className="gap-3.5 px-4">
               <PictureField
                 hasPicture={picture !== null}
                 error={pictureError}
@@ -304,7 +306,10 @@ export function TeammateForm({
 
           <Section id="s-model" title="AI model">
             <Card
-              className={cn("grid gap-4 px-4", !addingKey && "sm:grid-cols-2")}
+              className={cn(
+                "grid gap-3.5 px-4",
+                !addingKey && "sm:grid-cols-2"
+              )}
             >
               {providerKeys.length > 0 && (
                 <SelectField
@@ -370,7 +375,7 @@ export function TeammateForm({
               </AccordionTrigger>
               <AccordionContent
                 keepMounted
-                className="flex flex-col gap-6 pt-4"
+                className="flex flex-col gap-5 pt-3"
               >
                 <Section
                   id="s-ask"

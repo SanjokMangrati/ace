@@ -57,6 +57,7 @@ export function AddProviderKeyForm({
           names={{ provider: "provider", baseUrl: "baseUrl", apiKey: "apiKey" }}
           provider={provider}
           allowCustom={allowCustom}
+          onProviderChange={() => form.clearErrors()}
         />
         <button
           type="button"

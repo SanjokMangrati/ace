@@ -16,6 +16,20 @@ export async function listProviderKeys(userId: string) {
   }))
 }
 
+export async function listProviderKeySecrets(userId: string) {
+  return db.query.providerKey.findMany({
+    where: eq(providerKey.userId, userId),
+    columns: {
+      id: true,
+      provider: true,
+      baseUrl: true,
+      keyHint: true,
+      sealedKey: true,
+    },
+    orderBy: asc(providerKey.createdAt),
+  })
+}
+
 export async function findProviderKey(userId: string, id: string) {
   const row = await db.query.providerKey.findFirst({
     where: and(eq(providerKey.id, id), eq(providerKey.userId, userId)),

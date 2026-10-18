@@ -1,8 +1,13 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { EmptyState } from "@/components/app/setup-guide"
 import { countBots } from "@/server/db/queries/bots"
 import { listProviderKeys } from "@/server/db/queries/provider-keys"
 import { requireUser } from "@/server/session"
+
+export const metadata: Metadata = {
+  title: "Ace",
+}
 
 export default async function HomePage() {
   const user = await requireUser()

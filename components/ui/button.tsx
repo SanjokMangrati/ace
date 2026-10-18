@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonStyles = cva(
-  "group/button inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-transparent font-display text-button whitespace-nowrap transition duration-150 ease-out select-none disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
+  "group/button inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-transparent font-display text-button whitespace-nowrap transition duration-150 ease-out select-none disabled:cursor-not-allowed disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4.5",
   {
     variants: {
       variant: {
@@ -19,11 +19,11 @@ const buttonStyles = cva(
           "border-line-strong bg-surface text-danger not-disabled:hover:bg-danger-soft",
       },
       size: {
-        default: "h-control px-4.5",
-        sm: "h-control-sm px-3.5 text-small [&_svg:not([class*='size-'])]:size-4.5",
+        default: "h-control px-4",
+        sm: "h-control-sm gap-1.5 px-3 text-small [&_svg:not([class*='size-'])]:size-4",
         icon: "size-control",
         "icon-sm":
-          "size-control-sm [&_svg:not([class*='size-'])]:size-4.5",
+          "size-control-sm [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

@@ -10,6 +10,7 @@ import {
   ne,
   sql,
 } from "drizzle-orm"
+import type { QueueEvent } from "@/lib/chat"
 import { db, type Tx } from "@/server/db/client"
 import { awaitsAnswer } from "@/server/db/queries/chats"
 import { bot, chat, sandbox, sandboxWaiter, turn } from "@/server/db/schema"
@@ -120,11 +121,7 @@ export async function endTakeover(botId: string, waitRef: string) {
     .where(and(eq(sandbox.botId, botId), eq(sandbox.takeoverWaitRef, waitRef)))
 }
 
-export type LeaseHolder = {
-  chatId: string
-  title: string
-  waitingOn: "work" | "control" | "answer"
-}
+export type LeaseHolder = Omit<QueueEvent, "startedAt">
 
 type LeaseClaim =
   | { acquired: true; wake: string[] }

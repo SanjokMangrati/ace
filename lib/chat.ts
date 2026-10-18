@@ -23,7 +23,7 @@ export type QueueEvent = {
   startedAt?: number
 }
 
-type AnswerEvent = { toolCallId: string; at: number }
+type AnswerEvent = { toolCallId: string; at: number; askedAt: number }
 
 export type HandoffEvent = {
   id: string
@@ -111,9 +111,8 @@ export function nextTeammate<T extends Teammate>(
   lastBotId: string | null
 ) {
   const metadata = message?.metadata
-  const addressed = metadata?.handoff?.toBotId ?? metadata?.control?.botId
   const routed =
-    team.find((teammate) => teammate.id === addressed) ??
+    team.find((teammate) => teammate.id === metadata?.handoff?.toBotId) ??
     (message && mentionedTeammate(messageText(message), team)) ??
     team.find((teammate) => teammate.id === lastBotId)
   return routed ?? team[0]
@@ -137,8 +136,31 @@ export function handoffMessage(
   }
 }
 
-export function chatTitle(text: string) {
-  const line = text.trim().split("\n")[0].trim()
+export function controlMessage(
+  id: string,
+  control: Required<ControlEvent>
+): TeammateMessage {
+  return {
+    id,
+    role: "user",
+    parts: [
+      {
+        type: "text",
+        text: "I used your screen for a while and gave you back control. Look at it again before you use it.",
+      },
+    ],
+    metadata: { createdAt: control.gaveAt, control },
+  }
+}
+
+export function chatTitle(text: string, team: Teammate[]) {
+  const leadingMentions = new RegExp(
+    `^(?:${mentions(team).source}[\\s,:]*)+`,
+    "iu"
+  )
+  const first = text.trim().split("\n")[0].trim()
+  const rest = first.replace(leadingMentions, "")
+  const line = rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : first
   if (line.length <= TITLE_MAX_LENGTH) return line
   const cut = line.slice(0, TITLE_MAX_LENGTH)
   const space = cut.lastIndexOf(" ")

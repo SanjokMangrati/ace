@@ -214,6 +214,7 @@ export type Ask = {
   careful?: string
   answer: "pending" | "allowed" | "denied"
   answeredAt?: number
+  askedAt?: number
   shot?: Shot
 }
 
@@ -251,11 +252,10 @@ export function readMessage(
 ) {
   const notices: TurnNotice[] = []
   let queue: QueueEvent | undefined
-  const answeredAt = new Map<string, number>()
+  const answers = new Map<string, { at: number; askedAt: number }>()
   for (const part of message.parts) {
-    if (part.type === "data-answer") {
-      answeredAt.set(part.data.toolCallId, part.data.at)
-    }
+    if (part.type === "data-answer")
+      answers.set(part.data.toolCallId, part.data)
   }
 
   const drafts: Draft[] = [draft()]
@@ -282,7 +282,8 @@ export function readMessage(
       current.asks.push({
         ...approval,
         step,
-        answeredAt: answeredAt.get(step.key),
+        answeredAt: answers.get(step.key)?.at,
+        askedAt: answers.get(step.key)?.askedAt,
         shot,
       })
       current = draft()

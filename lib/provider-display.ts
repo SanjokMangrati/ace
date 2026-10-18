@@ -1,4 +1,4 @@
-import { type Provider, providerLabel } from "@/lib/models"
+import { type CatalogModel, type Provider, providerLabel } from "@/lib/models"
 
 type SavedProviderKey = {
   id: string
@@ -13,6 +13,8 @@ export type ProviderKeyOption = {
   label: string
   detail: string
 }
+
+export type ProviderKeyModels = ProviderKeyOption & { models: CatalogModel[] }
 
 function hostOf(baseUrl: string | null) {
   if (!baseUrl) return null

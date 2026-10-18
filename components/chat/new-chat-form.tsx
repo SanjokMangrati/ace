@@ -14,27 +14,39 @@ import { Composer, ComposerBar, ComposerHint } from "@/components/ui/composer"
 import { Spinner } from "@/components/ui/spinner"
 import { Tile } from "@/components/ui/tile"
 import { callAction, setActionError } from "@/lib/action-client"
-import { nameList } from "@/lib/chat"
+import { mentionedTeammate, nameList } from "@/lib/chat"
 import { type NewChatInput, newChatSchema } from "@/lib/chat-schemas"
+import type { ProviderKeyModels } from "@/lib/provider-display"
 import type { ChatTeammate } from "./chat-message"
+import { type ChatModel, ModelPicker } from "./model-picker"
 import { setPendingMessage, takePendingMessage } from "./pending-message"
 
 export function NewChatForm({
   chatId,
   defaultBotId,
   teammates,
+  providerKeys,
 }: {
   chatId: string
   defaultBotId: string
-  teammates: (Omit<ChatTeammate, "connected" | "fullAuto"> & { job: string })[]
+  teammates: (Omit<ChatTeammate, "connected" | "fullAuto"> & {
+    job: string
+    model: ChatModel
+  })[]
+  providerKeys: ProviderKeyModels[]
 }) {
   const form = useForm<NewChatInput>({
     resolver: zodResolver(newChatSchema),
-    defaultValues: { id: chatId, botIds: [defaultBotId], message: "" },
+    defaultValues: {
+      id: chatId,
+      botIds: [defaultBotId],
+      message: "",
+      models: {},
+    },
   })
-  const [botIds, message] = useWatch({
+  const [botIds, message, picks] = useWatch({
     control: form.control,
-    name: ["botIds", "message"],
+    name: ["botIds", "message", "models"],
   })
   const { isSubmitting, isSubmitSuccessful } = useFormState({
     control: form.control,
@@ -42,6 +54,9 @@ export function NewChatForm({
   const pending = isSubmitting || isSubmitSuccessful
   const picked = teammates.filter((teammate) => botIds.includes(teammate.id))
   const names = nameList(picked.map((teammate) => teammate.name))
+  const starter =
+    mentionedTeammate(message, picked) ??
+    picked.find((teammate) => teammate.id === botIds[0])
 
   async function onSubmit(values: NewChatInput) {
     setPendingMessage(values.id, values.message)
@@ -71,7 +86,7 @@ export function NewChatForm({
               botId={teammate.id}
               name={teammate.name}
               picture={teammate.picture}
-              size="lg"
+              size="md"
               aria-hidden
             />
           ),
@@ -79,9 +94,9 @@ export function NewChatForm({
       >
         <Link
           href="/teammates/new"
-          className="flex items-center gap-3.5 rounded-md border-1.5 border-dashed border-line-strong p-4 font-display text-button text-ink-2 transition duration-150 ease-out hover:bg-fill hover:text-ink"
+          className="flex items-center gap-3 rounded-md border-1.5 border-dashed border-line-strong px-3.5 py-3 font-display text-button text-ink-2 transition duration-150 ease-out hover:bg-fill hover:text-ink"
         >
-          <Tile className="size-12 rounded-avatar">
+          <Tile className="size-9 rounded-avatar">
             <PlusIcon weight="regular" />
           </Tile>
           New teammate
@@ -105,6 +120,19 @@ export function NewChatForm({
           <ComposerHint>
             {picked.length > 1 && `A group chat with ${names}`}
           </ComposerHint>
+          {starter && providerKeys.length > 0 && (
+            <ModelPicker
+              teammate={{
+                name: starter.name,
+                model: { ...starter.model, ...picks[starter.id] },
+              }}
+              providerKeys={providerKeys}
+              onPick={async (model) => {
+                form.setValue("models", { ...picks, [starter.id]: model })
+                return { ok: true }
+              }}
+            />
+          )}
           <Button
             type="submit"
             size="sm"

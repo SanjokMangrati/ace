@@ -24,13 +24,21 @@ const pageSchema = z.object({
   text: z.string(),
 })
 
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}
+
 export function parseWebOutput<S extends z.ZodType>(
   schema: S,
   result: { exitCode: number; output: string },
   failure: string
 ): z.output<S> {
   if (result.exitCode === 0) {
-    const parsed = schema.safeParse(JSON.parse(result.output))
+    const parsed = schema.safeParse(parseJson(result.output))
     if (parsed.success) return parsed.data
   }
   const reason = result.output.trim().slice(-ERROR_TAIL_CHARS)

@@ -11,7 +11,12 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message"
 import { TeammateAvatar } from "@/components/ui/avatar"
-import { messageText, splitMentions, type TeammateMessage } from "@/lib/chat"
+import {
+  messageText,
+  splitMentions,
+  type TeammateMessage,
+  type TurnNotice as TurnNoticeData,
+} from "@/lib/chat"
 import { Activity } from "./activity"
 import { HandoffCard } from "./handoff-card"
 import { readMessage, type Segment } from "./message-parts"
@@ -125,6 +130,7 @@ export function TeammateReply({
   message,
   working,
   error,
+  answeredAt,
   onKeepGoing,
   onAnswer,
 }: {
@@ -133,6 +139,7 @@ export function TeammateReply({
   message: TeammateMessage | undefined
   working: boolean
   error?: string
+  answeredAt?: Record<string, number>
   onKeepGoing?: () => void
   onAnswer?: (approvalId: string, approved: boolean) => void
 }) {
@@ -140,13 +147,26 @@ export function TeammateReply({
     ? readMessage(message, new Map(team.map((bot) => [bot.id, bot.name])))
     : { segments: [EMPTY], notices: [], queue: undefined }
   const upNext = working && queue?.startedAt === undefined ? queue : undefined
-  if (error && !notices.some((notice) => notice.reason === "error")) {
-    notices.push({ reason: "error", message: error })
-  }
+  const shownNotices: TurnNoticeData[] =
+    error && !notices.some((notice) => notice.reason === "error")
+      ? [...notices, { reason: "error", message: error }]
+      : notices
   const createdAt = message?.metadata?.createdAt
-  const startedAt =
-    segments.length > 1 ? message?.metadata?.resumedAt : createdAt
   const finishedAt = message?.metadata?.finishedAt
+  const durationMs = (index: number) => {
+    const startedAt =
+      index === 0
+        ? createdAt
+        : (segments[index - 1].asks.at(-1)?.answeredAt ??
+          message?.metadata?.resumedAt)
+    const endedAt =
+      index === segments.length - 1
+        ? finishedAt
+        : (segments[index].asks.at(-1)?.askedAt ?? finishedAt)
+    return startedAt !== undefined && endedAt !== undefined
+      ? endedAt - startedAt
+      : undefined
+  }
   const settingsHref = `/teammates/${teammate.id}`
 
   return (
@@ -171,11 +191,7 @@ export function TeammateReply({
                 <Activity
                   steps={segment.steps}
                   working={busy}
-                  durationMs={
-                    last && startedAt !== undefined && finishedAt !== undefined
-                      ? finishedAt - startedAt
-                      : undefined
-                  }
+                  durationMs={durationMs(index)}
                 />
               )}
               {segment.text && (
@@ -186,7 +202,10 @@ export function TeammateReply({
               {segment.asks.map((ask) => (
                 <PermissionCard
                   key={ask.step.key}
-                  ask={ask}
+                  ask={{
+                    ...ask,
+                    answeredAt: ask.answeredAt ?? answeredAt?.[ask.approvalId],
+                  }}
                   name={teammate.name}
                   fullAuto={teammate.fullAuto}
                   settingsHref={settingsHref}
@@ -199,7 +218,7 @@ export function TeammateReply({
             </Fragment>
           )
         })}
-        {notices.map((notice) => (
+        {shownNotices.map((notice) => (
           <TurnNotice
             key={notice.reason}
             notice={notice}
