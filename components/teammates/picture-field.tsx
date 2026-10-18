@@ -12,7 +12,7 @@ import {
 } from "@/lib/bot-schemas"
 
 export function checkPicture(file: File) {
-  if (!(PICTURE_TYPES as readonly string[]).includes(file.type)) {
+  if (!PICTURE_TYPES.some((type) => type === file.type)) {
     return PICTURE_TYPE_MESSAGE
   }
   if (file.size > PICTURE_MAX_BYTES) return PICTURE_SIZE_MESSAGE

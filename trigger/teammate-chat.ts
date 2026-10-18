@@ -1,5 +1,6 @@
 import { chat } from "@trigger.dev/sdk/ai"
 import { convertToModelMessages, type ModelMessage, type ToolSet } from "ai"
+import { cappedLimits } from "@/lib/bot-schemas"
 import {
   type HandoffEvent,
   handoffMessage,
@@ -7,11 +8,15 @@ import {
   TEAMMATE_CHAT_TASK,
   type TeammateMessage,
 } from "@/lib/chat"
+import { DAY_MS } from "@/lib/format"
 import { type CatalogModel, type Provider, providerLabel } from "@/lib/models"
 import { createAiGatewayCatalog } from "@/server/adapters/ai-gateway"
 import { createAiSdkModels } from "@/server/adapters/ai-sdk"
 import { createDaytonaSandboxes } from "@/server/adapters/daytona"
 import { createEnvKeyVault } from "@/server/adapters/env-key-vault"
+import { createOtelTelemetry } from "@/server/adapters/otel"
+import { createPinoLogger } from "@/server/adapters/pino"
+import { createPostgresBlobStore } from "@/server/adapters/postgres-blob"
 import { postgresTranscriptStorage } from "@/server/adapters/trigger/transcript-storage"
 import { triggerTurnRuntime } from "@/server/adapters/trigger/turn-runtime"
 import { approvalAnswers, approvalGate } from "@/server/agent/approvals"
@@ -32,7 +37,6 @@ import {
 import { interruptedNote, withLedger } from "@/server/agent/ledger"
 import {
   costUsd,
-  DAY_MS,
   endReason,
   type Price,
   type SandboxUse,
@@ -44,7 +48,12 @@ import { noteTools } from "@/server/agent/notes"
 import { systemPrompt } from "@/server/agent/prompt"
 import { judgeModelFor, judgeRisk, type ToolRisk } from "@/server/agent/risk"
 import { sandboxTools } from "@/server/agent/sandbox-tools"
-import { type TeamBot, teamPrompt, teamView } from "@/server/agent/team"
+import {
+  type TeamBot,
+  teamNames,
+  teamPrompt,
+  teamView,
+} from "@/server/agent/team"
 import { webTools } from "@/server/agent/web-tools"
 import {
   endRunningTurns,
@@ -67,8 +76,9 @@ import {
 } from "@/server/db/queries/sandboxes"
 import { loadScreenshot, saveScreenshot } from "@/server/db/queries/screenshots"
 import { askApproval, toolCallLedger } from "@/server/db/queries/tool-calls"
-import { env } from "@/server/env"
+import { env, teammateCaps } from "@/server/env"
 import type { ComputerHandlers } from "@/server/ports/computer"
+import type { Logger } from "@/server/ports/logger"
 import type { Sandbox } from "@/server/ports/sandbox"
 import {
   ANSWER_TIMEOUT_SEC,
@@ -81,8 +91,11 @@ import {
 
 const models = createAiSdkModels()
 const keyVault = createEnvKeyVault(env.ENCRYPTION_KEY)
+const blobs = createPostgresBlobStore()
 const modelCatalog = createAiGatewayCatalog()
 const sandboxes = createDaytonaSandboxes(env.DAYTONA_SNAPSHOT)
+const telemetry = createOtelTelemetry(env.NODE_ENV)
+const log = createPinoLogger()
 const runtime = triggerTurnRuntime
 
 const HANDED_BACK =
@@ -100,7 +113,10 @@ function providerModels(provider: Provider) {
   if (cached && Date.now() - cached.at < JUDGE_CHOICE_TTL_MS) {
     return cached.models
   }
-  const models = modelCatalog.list(provider).catch(() => [])
+  const models = modelCatalog.list(provider).catch((error) => {
+    log.warn("Model list unavailable", { provider, err: error })
+    return []
+  })
   providerModelCache.set(provider, { models, at: Date.now() })
   return models
 }
@@ -138,6 +154,7 @@ type Turn = {
   sandboxUse?: SandboxUse
   computer?: ComputerHandlers
   lease: SandboxLease
+  log: Logger
 }
 
 const turn = chat.local<{ current: Turn | null }>({ id: "turn" })
@@ -155,10 +172,6 @@ function turnCostUsd(current: Turn, steps: Turn["steps"]) {
     costUsd(current.price, totalUsage(steps)) +
     sandboxCostUsd(current.sandboxUse, Date.now())
   )
-}
-
-function teamNames(team: TeamBot[]) {
-  return new Map(team.map((bot) => [bot.id, bot.name]))
 }
 
 function openSandbox() {
@@ -243,7 +256,8 @@ const historyComputer: ComputerHandlers = {
     if (!computer) throw new Error("You can't use the screen right now.")
     return computer.execute(action)
   },
-  toModelOutput: (output) => computerModelOutput(output, loadScreenshot),
+  toModelOutput: (output) =>
+    computerModelOutput(output, (id) => loadScreenshot(blobs, id)),
 }
 
 async function handBackMessage(
@@ -290,7 +304,8 @@ export const teammateChat = chat
     onBoot: () => {
       turn.init({ current: null })
     },
-    onFailure: async ({ payload }) => {
+    onFailure: async ({ payload, error }) => {
+      log.error("Chat run failed", { chatId: payload.chatId, err: error })
       const ended = await endRunningTurns(payload.chatId)
       await Promise.all(
         ended.map((row) => releaseTurnLease(runtime, row.botId, row.id))
@@ -302,7 +317,7 @@ export const teammateChat = chat
       const answers = approvalAnswers(messages)
       const resumed =
         answers.length > 0 ? await resumeTurn(chatId, answers) : null
-      const bot = await findTeammate(
+      const teammate = await findTeammate(
         resumed?.botId ??
           nextTeammate(
             history.findLast((message) => message.role === "user"),
@@ -310,7 +325,8 @@ export const teammateChat = chat
             team.lastBotId
           ).id
       )
-      if (!bot) throw new Error("This chat no longer exists.")
+      if (!teammate) throw new Error("This chat no longer exists.")
+      const bot = { ...teammate, ...cappedLimits(teammate, teammateCaps) }
       const key = bot.providerKey
       if (!key) {
         throw new Error(
@@ -325,6 +341,7 @@ export const teammateChat = chat
         ? { id: resumed.id, interrupted: [] }
         : await startTurn(chatId, bot.id)
       const queueId = `queue-${turnId}`
+      const scope = { chatId, userId: bot.userId, botId: bot.id, turnId }
       const current: Turn = {
         id: turnId,
         chatId,
@@ -358,6 +375,7 @@ export const teammateChat = chat
               data: { ...waitedFor, startedAt: Date.now() },
             }),
         }),
+        log: log.child(scope),
       }
       turn.current = current
       chat.setUIMessageStreamOptions({
@@ -379,7 +397,7 @@ export const teammateChat = chat
       if (canSeeScreen) {
         const execute = computerExecutor({
           desktop: async () => (await openSandbox()).desktop(),
-          saveScreenshot: (data) => saveScreenshot(chatId, data),
+          saveScreenshot: (data) => saveScreenshot(blobs, chatId, data),
           waitForControl: async () =>
             (await waitForTakeover(current)) ? HANDED_BACK : null,
         })
@@ -431,6 +449,7 @@ export const teammateChat = chat
 
       const handBacks: HandBack[] = []
       return streamText({
+        ...telemetry.modelCall("teammate-turn", scope),
         model: models.languageModel(credentials, bot.modelId),
         system: systemPrompt({
           ...bot,
@@ -456,6 +475,7 @@ export const teammateChat = chat
               call,
               messages: seen,
               abortSignal: signal,
+              traced: telemetry.modelCall("risk-judge", scope),
             })
             current.judgeUsd += costUsd(judgePrice, verdict.usage)
             return verdict
@@ -516,8 +536,9 @@ export const teammateChat = chat
         onStepFinish: (step) => {
           current.steps.push(step)
         },
-        onError: () => {
+        onError: ({ error }) => {
           current.failed = true
+          current.log.error("Model call failed", { err: error })
         },
       })
     },
@@ -559,6 +580,7 @@ export const teammateChat = chat
       if (notice) writer.write({ type: "data-notice", data: notice })
 
       await finishTurn(current.id, { endReason: reason, ...totals })
+      current.log.info("Turn ended", { endReason: reason, ...totals })
       await current.lease.release()
       if (handoff) {
         const names = teamNames(current.team)

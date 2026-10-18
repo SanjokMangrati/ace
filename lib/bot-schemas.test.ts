@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest"
 import {
   type BotFormInput,
   botFormSchema,
+  cappedLimits,
   DEFAULT_ASK_BEFORE,
-  MAX_STEPS_LIMIT,
+  DEFAULT_LIMITS,
+  LIMIT_CEILINGS,
   NEW_KEY,
   type TeammateFormInput,
   teammateFormSchema,
@@ -17,21 +19,19 @@ const valid: BotFormInput = {
   providerKeyId: "5b0c1d3e-8f4a-4b2c-9d6e-7f8a9b0c1d2e",
   modelId: "claude-sonnet-5-5",
   fullAuto: false,
-  maxSteps: 50,
-  taskBudgetUsd: 1,
-  dailyBudgetUsd: 5,
+  ...DEFAULT_LIMITS,
   askBefore: DEFAULT_ASK_BEFORE,
 }
 
-function messages(value: unknown) {
-  const result = botFormSchema.safeParse(value)
+function messages(value: unknown, caps = LIMIT_CEILINGS) {
+  const result = botFormSchema(caps).safeParse(value)
   return result.error?.issues.map((issue) => issue.message) ?? []
 }
 
 describe("botFormSchema", () => {
   it("accepts a complete teammate and trims text", () => {
     expect(
-      botFormSchema.parse({ ...valid, name: "  Researcher  ", job: " Job " })
+      botFormSchema().parse({ ...valid, name: "  Researcher  ", job: " Job " })
     ).toMatchObject({ name: "Researcher", job: "Job" })
   })
 
@@ -56,9 +56,9 @@ describe("botFormSchema", () => {
     expect(messages({ ...valid, maxSteps: 0 })).toEqual([
       "Allow at least 1 step.",
     ])
-    expect(messages({ ...valid, maxSteps: MAX_STEPS_LIMIT + 1 })).toEqual([
-      `Keep it at ${MAX_STEPS_LIMIT} steps or fewer.`,
-    ])
+    expect(
+      messages({ ...valid, maxSteps: LIMIT_CEILINGS.maxSteps + 1 })
+    ).toEqual([`Keep it at ${LIMIT_CEILINGS.maxSteps} steps or fewer.`])
     expect(messages({ ...valid, maxSteps: 2.5 })).toEqual([
       "Use a whole number of steps.",
     ])
@@ -79,11 +79,32 @@ describe("botFormSchema", () => {
     ])
   })
 
+  it("holds the limits to the caps this Ace sets", () => {
+    const caps = { maxSteps: 20, taskBudgetUsd: 2, dailyBudgetUsd: 3 }
+    expect(
+      messages(
+        { ...valid, maxSteps: 21, taskBudgetUsd: 2.5, dailyBudgetUsd: 4 },
+        caps
+      )
+    ).toEqual([
+      "Keep it at 20 steps or fewer.",
+      "Keep it at $2 or less on one task.",
+      "Keep it at $3 or less a day.",
+    ])
+    expect(
+      cappedLimits({ maxSteps: 50, taskBudgetUsd: 1, dailyBudgetUsd: 5 }, caps)
+    ).toEqual({
+      maxSteps: 20,
+      taskBudgetUsd: 1,
+      dailyBudgetUsd: 3,
+    })
+  })
+
   it("requires every ask-before choice", () => {
     const { shell: _shell, ...rest } = DEFAULT_ASK_BEFORE
-    expect(botFormSchema.safeParse({ ...valid, askBefore: rest }).success).toBe(
-      false
-    )
+    expect(
+      botFormSchema().safeParse({ ...valid, askBefore: rest }).success
+    ).toBe(false)
   })
 })
 
@@ -94,11 +115,11 @@ describe("teammateFormSchema", () => {
   }
 
   it("ignores the new key fields when a saved key is picked", () => {
-    expect(teammateFormSchema.safeParse(form).success).toBe(true)
+    expect(teammateFormSchema().safeParse(form).success).toBe(true)
   })
 
   it("checks the new key when adding one", () => {
-    const result = teammateFormSchema.safeParse({
+    const result = teammateFormSchema().safeParse({
       ...form,
       providerKeyId: NEW_KEY,
     })
@@ -109,7 +130,7 @@ describe("teammateFormSchema", () => {
 
   it("accepts a complete new key", () => {
     expect(
-      teammateFormSchema.safeParse({
+      teammateFormSchema().safeParse({
         ...form,
         providerKeyId: NEW_KEY,
         newKey: { ...form.newKey, apiKey: "sk-ant-0123456789abcdefghij" },
@@ -119,7 +140,7 @@ describe("teammateFormSchema", () => {
 
   it("asks for a provider when none is picked", () => {
     expect(
-      teammateFormSchema
+      teammateFormSchema()
         .safeParse({ ...form, providerKeyId: "" })
         .error?.issues.map((issue) => issue.message)
     ).toEqual(["Pick an AI provider."])

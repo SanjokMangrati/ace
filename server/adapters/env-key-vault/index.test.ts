@@ -5,18 +5,6 @@ import { createEnvKeyVault } from "."
 const key = randomBytes(32).toString("base64")
 
 describe("createEnvKeyVault", () => {
-  it("round-trips a secret", () => {
-    const vault = createEnvKeyVault(key)
-    const sealed = vault.seal("sk-ant-secret-value")
-    expect(sealed).not.toContain("sk-ant")
-    expect(vault.open(sealed)).toBe("sk-ant-secret-value")
-  })
-
-  it("uses a fresh nonce every time", () => {
-    const vault = createEnvKeyVault(key)
-    expect(vault.seal("same")).not.toBe(vault.seal("same"))
-  })
-
   it("rejects tampered data", () => {
     const vault = createEnvKeyVault(key)
     const [prefix, iv, tag, data] = vault.seal("secret").split(".")

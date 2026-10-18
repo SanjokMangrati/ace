@@ -6,6 +6,7 @@ import {
   type TurnNotice,
 } from "@/lib/chat"
 import { siteOf } from "@/lib/format"
+import { NATIVE_ACTION_TYPES } from "@/server/ports/computer"
 
 type Part = TeammateMessage["parts"][number]
 
@@ -46,18 +47,11 @@ const screenVerbs: Record<string, ScreenVerb> = {
   cursor_position: "look",
   open_url: "open",
   click: "click",
-  left_click: "click",
-  right_click: "click",
-  middle_click: "click",
-  double_click: "click",
-  triple_click: "click",
   type: "type",
   key: "type",
   scroll: "scroll",
   move: "move",
-  mouse_move: "move",
   drag: "move",
-  left_click_drag: "move",
   wait: "wait",
 }
 
@@ -67,6 +61,7 @@ function screenStep(part: ComputerPart): Step {
   const input = part.input
   const action = input?.action
   const generic = typeof action === "object" ? action : undefined
+  const type = generic?.type ?? String(action)
   const [x, y] =
     generic && "x" in generic
       ? [generic.x, generic.y]
@@ -77,7 +72,7 @@ function screenStep(part: ComputerPart): Step {
     key: part.toolCallId,
     kind: "screen",
     state: toolState(part.state),
-    verb: screenVerbs[generic?.type ?? String(action)] ?? "look",
+    verb: screenVerbs[NATIVE_ACTION_TYPES[type] ?? type] ?? "look",
     intent: input && "intent" in input ? input.intent : undefined,
     text:
       generic && "text" in generic
@@ -90,7 +85,9 @@ function screenStep(part: ComputerPart): Step {
               ? input.text
               : undefined,
     shot:
-      part.state === "output-available" ? part.output.screenshot : undefined,
+      part.state === "output-available" && "screenshot" in part.output
+        ? part.output.screenshot
+        : undefined,
     at: typeof x === "number" && typeof y === "number" ? { x, y } : undefined,
   }
 }

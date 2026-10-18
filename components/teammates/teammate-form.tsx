@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { InfoIcon } from "@phosphor-icons/react/ssr"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { flushSync } from "react-dom"
 import { type FieldErrors, useForm, useWatch } from "react-hook-form"
 import { createTeammate, updateTeammate } from "@/app/(app)/teammates/actions"
@@ -40,6 +40,7 @@ import {
   ADVANCED_FIELDS,
   NEW_KEY,
   type TeammateFormInput,
+  type TeammateLimits,
   teammateFormSchema,
 } from "@/lib/bot-schemas"
 import {
@@ -80,6 +81,7 @@ export function TeammateForm({
   providerKeys,
   models,
   allowCustom,
+  limits,
   children,
 }: {
   mode: "create" | "edit"
@@ -90,11 +92,16 @@ export function TeammateForm({
   providerKeys: ProviderKeyOption[]
   models: ProviderModels
   allowCustom: boolean
+  limits: TeammateLimits
   children?: React.ReactNode
 }) {
   const closeModal = useCloseModal()
+  const resolver = useMemo(
+    () => zodResolver(teammateFormSchema(limits)),
+    [limits]
+  )
   const form = useForm<TeammateFormInput>({
-    resolver: zodResolver(teammateFormSchema),
+    resolver,
     defaultValues,
   })
   const [advanced, setAdvanced] = useState<string[]>([])

@@ -45,7 +45,9 @@
               "@ai-sdk/anthropic": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port.",
               "@ai-sdk/openai": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port.",
               "@ai-sdk/google": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port.",
-              "@ai-sdk/openai-compatible": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port."
+              "@ai-sdk/openai-compatible": "Import AI SDK providers only from server/adapters/ai-sdk. Use the ModelRegistry port.",
+              "pino": "Import Pino only from server/adapters/pino. Use the Logger port.",
+              "@ai-sdk/otel": "Import the AI SDK OpenTelemetry integration only from server/adapters/otel. Use the Telemetry port."
             },
             "patterns": [
               {
@@ -59,6 +61,10 @@
               {
                 "group": ["@trigger.dev/**"],
                 "message": "Import Trigger.dev only from server/adapters/trigger, trigger/, or components/chat/use-chat-transport.ts. Use the ChatRuntime port from @/server/container."
+              },
+              {
+                "group": ["@opentelemetry/**", "!@opentelemetry/api"],
+                "message": "Import OpenTelemetry exporters and SDKs only from server/adapters/otel or trigger.config.ts. Core uses the Telemetry port."
               }
             ]
           }
@@ -128,6 +134,26 @@
     },
     {
       "includes": ["server/adapters/ai-sdk/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["server/adapters/otel/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["server/adapters/pino/**"],
       "linter": {
         "rules": {
           "style": {

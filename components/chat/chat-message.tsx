@@ -44,16 +44,14 @@ function ControlEvents({
       text: `You took control of ${teammateName}'s screen`,
       at: tookAt,
     },
-    ...(gaveAt === undefined
-      ? []
-      : [
-          {
-            Icon: ArrowCounterClockwiseIcon,
-            text: "You gave back control",
-            at: gaveAt,
-          },
-        ]),
   ]
+  if (gaveAt !== undefined) {
+    events.push({
+      Icon: ArrowCounterClockwiseIcon,
+      text: "You gave back control",
+      at: gaveAt,
+    })
+  }
   return (
     <div className="flex flex-col gap-3">
       {events.map(({ Icon, text, at }) => (

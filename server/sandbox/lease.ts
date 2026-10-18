@@ -92,23 +92,21 @@ export function sandboxLease({
     if (waitedFor) onStarted(waitedFor)
   }
 
+  async function expireAt(until: Date) {
+    await setLeaseExpiry(botId, turnId, until)
+    await wakeBotWaiters(runtime, botId)
+  }
+
   return {
     ensure: async () => {
       if (!held) await acquire()
     },
-    park: async (until: Date) => {
-      await setLeaseExpiry(botId, turnId, until)
-      await wakeBotWaiters(runtime, botId)
-    },
-    unpark: async () => {
-      await setLeaseExpiry(botId, turnId, new Date(Date.now() + LEASE_TTL_MS))
-      await wakeBotWaiters(runtime, botId)
-    },
+    park: expireAt,
+    unpark: () => expireAt(new Date(Date.now() + LEASE_TTL_MS)),
     hold: async (until: Date) => {
       stopHeartbeat()
       held = false
-      await setLeaseExpiry(botId, turnId, until)
-      await wakeBotWaiters(runtime, botId)
+      await expireAt(until)
     },
     release: async () => {
       stopHeartbeat()

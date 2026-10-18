@@ -153,12 +153,10 @@ export function computerExecutor({
 }
 
 function describeComputerOutput(output: ComputerOutput) {
-  if (output.cursor) {
+  if ("cursor" in output) {
     return `The mouse is at x=${output.cursor.x}, y=${output.cursor.y}.`
   }
-  const screen = output.screenshot
-    ? `This is the screen now (${output.screenshot.width}×${output.screenshot.height}).`
-    : "Done."
+  const screen = `This is the screen now (${output.screenshot.width}×${output.screenshot.height}).`
   return output.note ? `${output.note}\n${screen}` : screen
 }
 
@@ -167,8 +165,9 @@ export async function computerModelOutput(
   loadScreenshot: (id: string) => Promise<Buffer | null>
 ): Promise<ToolResultPart["output"]> {
   const text = describeComputerOutput(output)
-  const data = output.screenshot && (await loadScreenshot(output.screenshot.id))
-  if (!data) return { type: "text", value: output.screenshot ? OMITTED : text }
+  if ("cursor" in output) return { type: "text", value: text }
+  const data = await loadScreenshot(output.screenshot.id)
+  if (!data) return { type: "text", value: OMITTED }
   return {
     type: "content",
     value: [

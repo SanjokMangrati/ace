@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ace}
+      POSTGRES_DB: ace
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ace -d ace"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  schema:
+    build:
+      context: .
+      target: schema
+    environment:
+      DATABASE_URL: postgres://ace:${POSTGRES_PASSWORD:-ace}@postgres:5432/ace
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      target: app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://ace:${POSTGRES_PASSWORD:-ace}@postgres:5432/ace
+    ports:
+      - ${APP_PORT:-3000}:3000
+    depends_on:
+      schema:
+        condition: service_completed_successfully
+
+volumes:
+  postgres:

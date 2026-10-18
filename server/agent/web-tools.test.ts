@@ -1,24 +1,20 @@
 import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
-import type { Sandbox } from "@/server/ports/sandbox"
+import { createFakeSandboxes } from "@/server/fakes/sandbox"
 import { shellQuote } from "@/server/sandbox/shell"
 import { PAGE_LIMIT_CHARS, parseWebOutput, webTools } from "./web-tools"
 
 const options = { toolCallId: "call-1", messages: [], context: {} }
 
-function fakeSandbox(result: { exitCode: number; output: string }) {
+async function openSandbox(output: unknown) {
+  const sandbox = await createFakeSandboxes(() => ({
+    exitCode: 0,
+    output: JSON.stringify(output),
+  })).open("bot")
   return {
-    ref: "sandbox-1",
-    usdPerHour: 0.2,
-    exec: vi.fn(async () => result),
-    fs: {
-      stat: async () => ({ isDir: false, size: 0 }),
-      read: async () => Buffer.alloc(0),
-      write: async () => {},
-      list: async () => [],
-    },
-    desktop: () => Promise.reject(new Error("No desktop in this test.")),
-  } satisfies Sandbox
+    exec: vi.spyOn(sandbox, "exec"),
+    tools: webTools(async () => sandbox),
+  }
 }
 
 describe("shellQuote", () => {
@@ -54,30 +50,21 @@ describe("webTools", () => {
     const results = [
       { title: "Fender", url: "https://fender.com", snippet: "Guitars" },
     ]
-    const sandbox = fakeSandbox({
-      exitCode: 0,
-      output: JSON.stringify({ results }),
-    })
-    const tools = webTools(async () => sandbox)
+    const { exec, tools } = await openSandbox({ results })
     await expect(
       tools.web_search.execute?.({ query: "fender strat price" }, options)
     ).resolves.toEqual({ results })
-    expect(sandbox.exec).toHaveBeenCalledWith(
-      "ace-web search 'fender strat price'",
-      { timeoutSec: 30 }
-    )
+    expect(exec).toHaveBeenCalledWith("ace-web search 'fender strat price'", {
+      timeoutSec: 30,
+    })
   })
 
   it("reads a page and cuts long text in the middle", async () => {
-    const sandbox = fakeSandbox({
-      exitCode: 0,
-      output: JSON.stringify({
-        title: "Strat",
-        url: "https://fender.com/strat",
-        text: "x".repeat(PAGE_LIMIT_CHARS * 2),
-      }),
+    const { tools } = await openSandbox({
+      title: "Strat",
+      url: "https://fender.com/strat",
+      text: "x".repeat(PAGE_LIMIT_CHARS * 2),
     })
-    const tools = webTools(async () => sandbox)
     const page = await tools.web_fetch.execute?.(
       { url: "https://fender.com/strat" },
       options

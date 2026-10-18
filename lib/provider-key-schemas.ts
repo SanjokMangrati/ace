@@ -1,6 +1,6 @@
 import { createInsertSchema } from "drizzle-zod"
 import { z } from "zod"
-import { PROVIDER_INFO, type Provider } from "@/lib/models"
+import { PROVIDER_LABELS, type Provider } from "@/lib/models"
 import { providerKey } from "@/server/db/schema/bots"
 
 const API_KEY_MIN_LENGTH = 20
@@ -46,7 +46,7 @@ export function checkProviderKey(
     }
     return
   }
-  const label = PROVIDER_INFO[value.provider].label
+  const label = PROVIDER_LABELS[value.provider]
   if (!value.apiKey) {
     ctx.addIssue({
       code: "custom",

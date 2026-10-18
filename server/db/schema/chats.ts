@@ -1,5 +1,4 @@
 import type { UIMessage } from "ai"
-import { relations } from "drizzle-orm"
 import {
   boolean,
   foreignKey,
@@ -15,7 +14,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core"
 import { user } from "./auth"
-import { bot, bytea } from "./bots"
+import { bot } from "./bots"
 
 export const turnEndReason = pgEnum("turn_end_reason", [
   "done",
@@ -180,7 +179,6 @@ export const screenshot = pgTable(
     chatId: uuid("chat_id")
       .notNull()
       .references(() => chat.id, { onDelete: "cascade" }),
-    data: bytea("data").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -215,23 +213,3 @@ export const handoff = pgTable(
     ),
   ]
 )
-
-export const chatRelations = relations(chat, ({ one, many }) => ({
-  user: one(user, { fields: [chat.userId], references: [user.id] }),
-  members: many(chatMember),
-  messages: many(message),
-  turns: many(turn),
-}))
-
-export const chatMemberRelations = relations(chatMember, ({ one }) => ({
-  chat: one(chat, { fields: [chatMember.chatId], references: [chat.id] }),
-  bot: one(bot, { fields: [chatMember.botId], references: [bot.id] }),
-}))
-
-export const messageRelations = relations(message, ({ one }) => ({
-  chat: one(chat, { fields: [message.chatId], references: [chat.id] }),
-}))
-
-export const turnRelations = relations(turn, ({ one }) => ({
-  chat: one(chat, { fields: [turn.chatId], references: [chat.id] }),
-}))

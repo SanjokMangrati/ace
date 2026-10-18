@@ -1,5 +1,15 @@
 import "server-only"
-import { and, asc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm"
+import {
+  and,
+  asc,
+  eq,
+  exists,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  sql,
+} from "drizzle-orm"
 import { db, type Tx } from "@/server/db/client"
 import { awaitsAnswer } from "@/server/db/queries/chats"
 import { bot, chat, sandbox, sandboxWaiter, turn } from "@/server/db/schema"
@@ -42,7 +52,12 @@ export async function findTakeover(botId: string) {
 }
 
 const owned = (userId: string) =>
-  sql`exists (select 1 from ${bot} where ${bot.id} = ${sandbox.botId} and ${bot.userId} = ${userId})`
+  exists(
+    db
+      .select({ id: bot.id })
+      .from(bot)
+      .where(and(eq(bot.id, sandbox.botId), eq(bot.userId, userId)))
+  )
 
 export async function takeControl(
   userId: string,
@@ -146,10 +161,10 @@ async function lockSandbox(tx: Tx, botId: string) {
     .where(
       and(
         eq(sandboxWaiter.sandboxId, row.id),
-        sql`${sandboxWaiter.turnId} in (${tx
-          .select({ id: turn.id })
-          .from(turn)
-          .where(isNotNull(turn.endedAt))})`
+        inArray(
+          sandboxWaiter.turnId,
+          tx.select({ id: turn.id }).from(turn).where(isNotNull(turn.endedAt))
+        )
       )
     )
   return row

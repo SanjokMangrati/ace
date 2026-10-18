@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { botFormSchema } from "./bot-schemas"
 import { findPreset, TEAMMATE_PRESETS } from "./teammate-presets"
 
-const profileSchema = botFormSchema.pick({
+const profileSchema = botFormSchema().pick({
   name: true,
   job: true,
   instructions: true,
@@ -28,13 +28,13 @@ describe("TEAMMATE_PRESETS", () => {
 })
 
 describe("findPreset", () => {
+  const [writer] = TEAMMATE_PRESETS.filter((preset) => preset.id === "writer")
+
   it("finds a preset whose fields are unchanged", () => {
-    const [writer] = TEAMMATE_PRESETS.filter((preset) => preset.id === "writer")
     expect(findPreset(writer)?.id).toBe("writer")
   })
 
   it("returns nothing once a field is edited", () => {
-    const [writer] = TEAMMATE_PRESETS.filter((preset) => preset.id === "writer")
     expect(findPreset({ ...writer, name: "Penny" })).toBeUndefined()
   })
 })

@@ -6,12 +6,7 @@ import {
   type FieldPath,
   type FieldValues,
 } from "react-hook-form"
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 
 type TextareaFieldProps<TValues extends FieldValues> = Omit<
@@ -21,14 +16,12 @@ type TextareaFieldProps<TValues extends FieldValues> = Omit<
   control: Control<TValues>
   name: FieldPath<TValues>
   label: React.ReactNode
-  description?: React.ReactNode
 }
 
 export function TextareaField<TValues extends FieldValues>({
   control,
   name,
   label,
-  description,
   ...textareaProps
 }: TextareaFieldProps<TValues>) {
   return (
@@ -45,11 +38,7 @@ export function TextareaField<TValues extends FieldValues>({
             value={field.value ?? ""}
             aria-invalid={fieldState.invalid}
           />
-          {fieldState.invalid ? (
-            <FieldError errors={[fieldState.error]} />
-          ) : (
-            description && <FieldDescription>{description}</FieldDescription>
-          )}
+          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
         </Field>
       )}
     />

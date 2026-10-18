@@ -1,9 +1,19 @@
 import { z } from "zod"
+import { LIMIT_CEILINGS, type TeammateLimits } from "@/lib/bot-schemas"
 
 const optionalString = z
   .string()
   .optional()
   .transform((value) => value?.trim() || undefined)
+
+const blankAsUnset = (value: unknown) => (value === "" ? undefined : value)
+
+function cap(ceiling: number, min: number) {
+  return z.preprocess(
+    blankAsUnset,
+    z.coerce.number().min(min).max(ceiling).default(ceiling)
+  )
+}
 
 const schema = z
   .object({
@@ -26,6 +36,13 @@ const schema = z
     TRIGGER_SECRET_KEY: z.string().min(1),
     DAYTONA_API_KEY: z.string().min(1),
     DAYTONA_SNAPSHOT: z.string().min(1).default("ace-desktop"),
+    MAX_TEAMMATES: z.preprocess(
+      blankAsUnset,
+      z.coerce.number().int().min(1).optional()
+    ),
+    MAX_STEPS: cap(LIMIT_CEILINGS.maxSteps, 1).pipe(z.int()),
+    MAX_TASK_BUDGET_USD: cap(LIMIT_CEILINGS.taskBudgetUsd, 0.01),
+    MAX_DAILY_BUDGET_USD: cap(LIMIT_CEILINGS.dailyBudgetUsd, 0.01),
   })
   .refine((env) => !env.GITHUB_CLIENT_ID === !env.GITHUB_CLIENT_SECRET, {
     message: "Set both GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or neither.",
@@ -33,3 +50,9 @@ const schema = z
   })
 
 export const env = schema.parse(process.env)
+
+export const teammateCaps: TeammateLimits = {
+  maxSteps: env.MAX_STEPS,
+  taskBudgetUsd: env.MAX_TASK_BUDGET_USD,
+  dailyBudgetUsd: env.MAX_DAILY_BUDGET_USD,
+}

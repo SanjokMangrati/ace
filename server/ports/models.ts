@@ -2,7 +2,7 @@ import type { LanguageModel, Tool } from "ai"
 import type { Provider } from "@/lib/models"
 import type { ComputerHandlers } from "./computer"
 
-type ProviderCredentials = {
+export type ProviderCredentials = {
   provider: Provider
   apiKey: string | undefined
   baseUrl: string | null

@@ -3,7 +3,7 @@
 import type { Control, FieldPath, FieldValues } from "react-hook-form"
 import { SegmentedField } from "@/components/form/segmented-field"
 import { TextField } from "@/components/form/text-field"
-import { PROVIDER_INFO, PROVIDERS, type Provider } from "@/lib/models"
+import { PROVIDER_LABELS, PROVIDERS, type Provider } from "@/lib/models"
 
 export function ProviderKeyFields<TValues extends FieldValues>({
   control,
@@ -25,7 +25,7 @@ export function ProviderKeyFields<TValues extends FieldValues>({
   const custom = provider === "openai_compatible"
   const options = PROVIDERS.filter(
     (item) => allowCustom || item !== "openai_compatible"
-  ).map((item) => ({ value: item, label: PROVIDER_INFO[item].label }))
+  ).map((item) => ({ value: item, label: PROVIDER_LABELS[item] }))
 
   return (
     <>
@@ -34,7 +34,7 @@ export function ProviderKeyFields<TValues extends FieldValues>({
         name={names.provider}
         label="Provider"
         options={options}
-        onValueChange={(value) => onProviderChange?.(value as Provider)}
+        onValueChange={onProviderChange}
       />
       {custom && (
         <TextField
@@ -58,7 +58,7 @@ export function ProviderKeyFields<TValues extends FieldValues>({
         description={
           custom
             ? "Only if your server asks for one."
-            : `Copy it from your ${PROVIDER_INFO[provider].label} account settings.`
+            : `Copy it from your ${PROVIDER_LABELS[provider]} account settings.`
         }
       />
     </>

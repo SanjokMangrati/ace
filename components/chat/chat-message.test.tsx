@@ -73,7 +73,10 @@ describe("TeammateReply while up next", () => {
 })
 
 describe("TeammateReply asking for permission", () => {
-  function asking(approval: object, state = "approval-requested") {
+  function asking(
+    approval: { approved?: boolean; requestReason?: string },
+    state: "approval-requested" | "approval-responded" = "approval-requested"
+  ) {
     return {
       id: "m2",
       role: "assistant",

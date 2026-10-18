@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { Sandbox } from "@/server/ports/sandbox"
+import { createFakeSandboxes } from "@/server/fakes/sandbox"
 import {
   OUTPUT_LIMIT_CHARS,
   READ_LIMIT_BYTES,
@@ -9,29 +9,17 @@ import {
 
 const options = { toolCallId: "call-1", messages: [], context: {} }
 
-function fakeSandbox(file: { data: Buffer; isDir?: boolean }) {
-  return {
-    ref: "sandbox-1",
-    usdPerHour: 0.2,
-    exec: vi.fn(async () => ({
-      exitCode: 0,
-      output: "x".repeat(OUTPUT_LIMIT_CHARS * 2),
-    })),
-    fs: {
-      stat: async () => ({
-        isDir: file.isDir ?? false,
-        size: file.data.length,
-      }),
-      read: async () => file.data,
-      write: vi.fn(async () => {}),
-      list: async () => [],
-    },
-    desktop: () => Promise.reject(new Error("No desktop in this test.")),
-  } satisfies Sandbox
-}
+const LONG_OUTPUT = "x".repeat(OUTPUT_LIMIT_CHARS * 2)
 
-function toolsFor(sandbox: Sandbox) {
-  return sandboxTools(async () => sandbox)
+async function openSandbox(files: Record<string, Buffer> = {}) {
+  const sandbox = await createFakeSandboxes(() => ({
+    exitCode: 0,
+    output: LONG_OUTPUT,
+  })).open("bot")
+  for (const [path, data] of Object.entries(files)) {
+    await sandbox.fs.write(path, data)
+  }
+  return { sandbox, tools: sandboxTools(async () => sandbox) }
 }
 
 describe("truncateMiddle", () => {
@@ -48,51 +36,48 @@ describe("truncateMiddle", () => {
 
 describe("shell", () => {
   it("cuts long output to the limit", async () => {
-    const sandbox = fakeSandbox({ data: Buffer.from("") })
-    const result = await toolsFor(sandbox).shell.execute?.(
+    const { sandbox, tools } = await openSandbox()
+    const exec = vi.spyOn(sandbox, "exec")
+    const result = await tools.shell.execute?.(
       { purpose: "list files", command: "ls", timeoutSeconds: 5 },
       options
     )
-    expect(sandbox.exec).toHaveBeenCalledWith("ls", {
-      cwd: undefined,
-      timeoutSec: 5,
-    })
+    expect(exec).toHaveBeenCalledWith("ls", { cwd: undefined, timeoutSec: 5 })
     expect(result).toEqual({
       exitCode: 0,
-      output: truncateMiddle(
-        "x".repeat(OUTPUT_LIMIT_CHARS * 2),
-        OUTPUT_LIMIT_CHARS
-      ),
+      output: truncateMiddle(LONG_OUTPUT, OUTPUT_LIMIT_CHARS),
     })
   })
 })
 
 describe("fs_read", () => {
   it("returns the text of a small file", async () => {
-    const tools = toolsFor(fakeSandbox({ data: Buffer.from("hi") }))
+    const { tools } = await openSandbox({ "notes.txt": Buffer.from("hi") })
     await expect(
       tools.fs_read.execute?.({ path: "notes.txt" }, options)
     ).resolves.toEqual({ content: "hi" })
   })
 
   it("refuses files over the limit", async () => {
-    const tools = toolsFor(
-      fakeSandbox({ data: Buffer.alloc(READ_LIMIT_BYTES + 1, 97) })
-    )
+    const { tools } = await openSandbox({
+      "big.log": Buffer.alloc(READ_LIMIT_BYTES + 1, 97),
+    })
     await expect(
       tools.fs_read.execute?.({ path: "big.log" }, options)
     ).rejects.toThrow("over the")
   })
 
   it("refuses binary files", async () => {
-    const tools = toolsFor(fakeSandbox({ data: Buffer.from([1, 0, 2]) }))
+    const { tools } = await openSandbox({ "photo.png": Buffer.from([1, 0, 2]) })
     await expect(
       tools.fs_read.execute?.({ path: "photo.png" }, options)
     ).rejects.toThrow("binary")
   })
 
   it("refuses folders", async () => {
-    const tools = toolsFor(fakeSandbox({ data: Buffer.from(""), isDir: true }))
+    const { tools } = await openSandbox({
+      "Documents/a.txt": Buffer.from("a"),
+    })
     await expect(
       tools.fs_read.execute?.({ path: "Documents" }, options)
     ).rejects.toThrow("folder")
@@ -101,13 +86,10 @@ describe("fs_read", () => {
 
 describe("fs_write", () => {
   it("saves the content as UTF-8", async () => {
-    const sandbox = fakeSandbox({ data: Buffer.from("") })
+    const { sandbox, tools } = await openSandbox()
     await expect(
-      toolsFor(sandbox).fs_write.execute?.(
-        { path: "a.md", content: "é" },
-        options
-      )
+      tools.fs_write.execute?.({ path: "a.md", content: "é" }, options)
     ).resolves.toEqual({ bytes: 2 })
-    expect(sandbox.fs.write).toHaveBeenCalledWith("a.md", Buffer.from("é"))
+    await expect(sandbox.fs.read("a.md")).resolves.toEqual(Buffer.from("é"))
   })
 })

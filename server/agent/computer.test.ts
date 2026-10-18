@@ -1,6 +1,5 @@
 import type { ModelMessage } from "ai"
-import { afterEach, describe, expect, it, vi } from "vitest"
-import type { ComputerAction } from "@/server/ports/computer"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Desktop } from "@/server/ports/sandbox"
 import {
   computerExecutor,
@@ -33,18 +32,21 @@ function fakeDesktop(size = { width: 1280, height: 800 }) {
 }
 
 function executorFor(desktop: Desktop, note: string | null = null) {
-  const execute = computerExecutor({
+  return computerExecutor({
     desktop: async () => desktop,
     saveScreenshot: async () => "shot-1",
     waitForControl: async () => note,
   })
-  return async (actions: ComputerAction[]) => {
-    vi.useFakeTimers()
-    const pending = execute(actions)
-    await vi.runAllTimersAsync()
-    return pending
-  }
 }
+
+async function settled<T>(pending: Promise<T>) {
+  await vi.runAllTimersAsync()
+  return pending
+}
+
+beforeEach(() => {
+  vi.useFakeTimers()
+})
 
 afterEach(() => {
   vi.useRealTimers()
@@ -67,9 +69,11 @@ describe("coordinate scaling", () => {
 describe("computer executor", () => {
   it("clicks in screen pixels and returns a fresh screenshot", async () => {
     const desktop = fakeDesktop({ width: 2560, height: 1600 })
-    const output = await executorFor(desktop)([
-      { type: "click", x: 100, y: 50, button: "left", clicks: 2 },
-    ])
+    const output = await settled(
+      executorFor(desktop)([
+        { type: "click", x: 100, y: 50, button: "left", clicks: 2 },
+      ])
+    )
     expect(desktop.click).toHaveBeenCalledWith(
       { x: 200, y: 100 },
       { button: "left", clicks: 2, modifiers: [] }
@@ -82,9 +86,9 @@ describe("computer executor", () => {
 
   it("presses each key in a sequence, as many times as asked", async () => {
     const desktop = fakeDesktop()
-    await executorFor(desktop)([
-      { type: "key", keys: "Down Return", repeat: 2 },
-    ])
+    await settled(
+      executorFor(desktop)([{ type: "key", keys: "Down Return", repeat: 2 }])
+    )
     expect(desktop.key.mock.calls.map(([combo]) => combo)).toEqual([
       "Down",
       "Return",
@@ -109,12 +113,7 @@ describe("computer executor", () => {
       order.push("screenshot")
       return Buffer.from("jpeg")
     })
-    vi.useFakeTimers()
-    const pending = computerExecutor({
-      desktop: async () => desktop,
-      saveScreenshot: async () => "shot-1",
-      waitForControl: async () => null,
-    })([
+    const pending = executorFor(desktop)([
       { type: "click", x: 1, y: 1, button: "left", clicks: 1 },
       { type: "type", text: "guitars" },
       { type: "key", keys: "enter" },
@@ -129,12 +128,9 @@ describe("computer executor", () => {
 
   it("opens a page and gives it longer to load", async () => {
     const desktop = fakeDesktop()
-    vi.useFakeTimers()
-    const pending = computerExecutor({
-      desktop: async () => desktop,
-      saveScreenshot: async () => "shot-1",
-      waitForControl: async () => null,
-    })([{ type: "open_url", url: "https://example.com/?q=guitars" }])
+    const pending = executorFor(desktop)([
+      { type: "open_url", url: "https://example.com/?q=guitars" },
+    ])
     await vi.advanceTimersByTimeAsync(SETTLE_MS)
     expect(desktop.open).toHaveBeenCalledWith("https://example.com/?q=guitars")
     expect(desktop.screenshot).not.toHaveBeenCalled()
@@ -146,20 +142,24 @@ describe("computer executor", () => {
   it("reports the cursor without a screenshot", async () => {
     const desktop = fakeDesktop({ width: 2560, height: 1600 })
     await expect(
-      executorFor(desktop)([{ type: "cursor_position" }])
+      settled(executorFor(desktop)([{ type: "cursor_position" }]))
     ).resolves.toEqual({ cursor: { x: 640, y: 200 } })
     expect(desktop.screenshot).not.toHaveBeenCalled()
   })
 
   it("skips the actions after you had control and shows the screen", async () => {
     const desktop = fakeDesktop()
-    const output = await executorFor(
-      desktop,
-      "You had control."
-    )([{ type: "type", text: "hello" }])
+    const output = await settled(
+      executorFor(
+        desktop,
+        "You had control."
+      )([{ type: "type", text: "hello" }])
+    )
     expect(desktop.type).not.toHaveBeenCalled()
-    expect(output.note).toBe("You had control.")
-    expect(output.screenshot?.id).toBe("shot-1")
+    expect(output).toMatchObject({
+      note: "You had control.",
+      screenshot: { id: "shot-1" },
+    })
   })
 })
 

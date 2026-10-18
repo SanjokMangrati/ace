@@ -34,15 +34,23 @@ export type ComputerAction =
   | { type: "open_url"; url: string }
   | { type: "cursor_position" }
 
-export type ComputerOutput = {
-  screenshot?: { id: string; width: number; height: number }
-  cursor?: Point
-  note?: string
-}
+export type ComputerOutput =
+  | { screenshot: { id: string; width: number; height: number }; note?: string }
+  | { cursor: Point }
 
 export type ComputerHandlers = {
   execute(actions: ComputerAction[]): Promise<ComputerOutput>
   toModelOutput(output: ComputerOutput): Promise<ToolResultPart["output"]>
+}
+
+export const NATIVE_ACTION_TYPES: Record<string, ComputerAction["type"]> = {
+  left_click: "click",
+  right_click: "click",
+  middle_click: "click",
+  double_click: "click",
+  triple_click: "click",
+  mouse_move: "move",
+  left_click_drag: "drag",
 }
 
 export type NativeComputerInput = {

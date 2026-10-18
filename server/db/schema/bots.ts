@@ -1,7 +1,6 @@
 import { relations } from "drizzle-orm"
 import {
   boolean,
-  customType,
   index,
   integer,
   numeric,
@@ -13,10 +12,6 @@ import {
   uuid,
 } from "drizzle-orm/pg-core"
 import { user } from "./auth"
-
-export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
-  dataType: () => "bytea",
-})
 
 export const providerKind = pgEnum("provider_kind", [
   "anthropic",
@@ -61,8 +56,7 @@ export const bot = pgTable(
     name: text("name").notNull(),
     job: text("job").notNull(),
     instructions: text("instructions").notNull().default(""),
-    picture: bytea("picture"),
-    pictureType: text("picture_type"),
+    pictureKey: text("picture_key"),
     providerKeyId: uuid("provider_key_id").references(() => providerKey.id, {
       onDelete: "set null",
     }),

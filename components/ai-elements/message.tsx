@@ -4,6 +4,7 @@ import type { UIMessage } from "ai"
 import type { ComponentProps, HTMLAttributes } from "react"
 import { memo } from "react"
 import { type Components, Streamdown } from "streamdown"
+import { textLinkClass } from "@/components/ui/text-link"
 import { cn } from "@/lib/utils"
 
 type MessageProps = HTMLAttributes<HTMLDivElement> & {
@@ -54,10 +55,7 @@ const proseComponents: Components = {
   ),
   a: ({ node: _node, className, ...props }) => (
     <a
-      className={cn(
-        "text-ink underline decoration-line-strong underline-offset-3 hover:decoration-current",
-        className
-      )}
+      className={cn(textLinkClass, className)}
       target="_blank"
       rel="noreferrer"
       {...props}

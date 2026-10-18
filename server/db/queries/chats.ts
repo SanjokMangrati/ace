@@ -12,12 +12,14 @@ import {
   isNotNull,
   isNull,
   not,
+  type SQL,
   sql,
   sum,
 } from "drizzle-orm"
 import { askBeforeFrom } from "@/lib/bot-schemas"
 import type { TeammateMessage } from "@/lib/chat"
 import type { ApprovalAnswer } from "@/server/agent/approvals"
+import { blobKeys } from "@/server/blob-keys"
 import { db, type Tx } from "@/server/db/client"
 import {
   approval,
@@ -33,6 +35,7 @@ import {
   turn,
   type turnEndReason,
 } from "@/server/db/schema"
+import type { BlobStore } from "@/server/ports/blob-store"
 
 export type TurnEndReason = (typeof turnEndReason.enumValues)[number]
 
@@ -49,18 +52,21 @@ export const awaitsAnswer = exists(
     .where(and(eq(approval.turnId, turn.id), eq(approval.status, "pending")))
 )
 
+export function openTurnStatus(owner: SQL) {
+  const hasOpenTurn = (asking: SQL) =>
+    sql<boolean>`${exists(
+      db
+        .select({ id: turn.id })
+        .from(turn)
+        .where(and(owner, isNull(turn.endedAt), asking))
+    )}`
+  return {
+    working: hasOpenTurn(not(awaitsAnswer)),
+    needsYou: hasOpenTurn(awaitsAnswer),
+  }
+}
+
 const openTurn = and(eq(turn.chatId, chat.id), isNull(turn.endedAt))
-
-const working = exists(
-  db
-    .select({ id: turn.id })
-    .from(turn)
-    .where(and(openTurn, not(awaitsAnswer)))
-)
-
-const needsYou = exists(
-  db.select({ id: turn.id }).from(turn).where(and(openTurn, awaitsAnswer))
-)
 
 const queued = exists(
   db
@@ -80,7 +86,7 @@ const inControl = exists(
 const botColumns = {
   id: bot.id,
   name: bot.name,
-  hasPicture: sql<boolean>`${isNotNull(bot.picture)}`,
+  hasPicture: sql<boolean>`${isNotNull(bot.pictureKey)}`,
   updatedAt: bot.updatedAt,
 }
 
@@ -109,8 +115,7 @@ export async function listChats(userId: string) {
       id: chat.id,
       title: chat.title,
       updatedAt: chat.updatedAt,
-      working: sql<boolean>`${working}`,
-      needsYou: sql<boolean>`${needsYou}`,
+      ...openTurnStatus(eq(turn.chatId, chat.id)),
       queued: sql<boolean>`${queued}`,
       inControl: sql<boolean>`${inControl}`,
     })
@@ -194,12 +199,14 @@ export async function insertChat(
   return true
 }
 
-export async function deleteChat(userId: string, id: string) {
+export async function deleteChat(blobs: BlobStore, userId: string, id: string) {
   const rows = await db
     .delete(chat)
     .where(and(eq(chat.id, id), eq(chat.userId, userId)))
     .returning({ id: chat.id })
-  return rows.length > 0
+  if (rows.length === 0) return false
+  await blobs.deletePrefix(blobKeys.chat(id))
+  return true
 }
 
 export async function findChatTeam(chatId: string) {
@@ -215,6 +222,7 @@ export async function findTeammate(botId: string) {
     where: eq(bot.id, botId),
     columns: {
       id: true,
+      userId: true,
       name: true,
       job: true,
       instructions: true,

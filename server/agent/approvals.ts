@@ -104,9 +104,6 @@ export function approvalGate({
     const assessment = await assess(toolCall, messages, policy)
     await onAssessed(toolCall, assessment)
     if (!assessment.ask) return undefined
-    return {
-      type: "user-approval",
-      reason: assessment.ask === "critical" ? assessment.reason : undefined,
-    }
+    return { type: "user-approval", reason: assessment.reason }
   }
 }

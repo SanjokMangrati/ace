@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { auth } from "@/server/container"
+import { auth, blobs } from "@/server/container"
 import { findScreenshot } from "@/server/db/queries/screenshots"
 
 export async function GET(
@@ -12,7 +12,7 @@ export async function GET(
   const id = z.uuid().safeParse((await params).id)
   if (!id.success) return new Response(null, { status: 404 })
 
-  const data = await findScreenshot(session.user.id, id.data)
+  const data = await findScreenshot(blobs, session.user.id, id.data)
   if (!data) return new Response(null, { status: 404 })
 
   return new Response(new Uint8Array(data), {

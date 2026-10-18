@@ -1,24 +1,14 @@
 import "server-only"
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  exists,
-  inArray,
-  isNotNull,
-  isNull,
-  not,
-  sql,
-} from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm"
 import {
   askBeforeFrom,
   type BotFormInput,
   TOOL_GROUPS,
   type ToolGroup,
 } from "@/lib/bot-schemas"
+import { blobKeys } from "@/server/blob-keys"
 import { type Db, db } from "@/server/db/client"
-import { awaitsAnswer } from "@/server/db/queries/chats"
+import { openTurnStatus } from "@/server/db/queries/chats"
 import {
   insertProviderKey,
   type NewProviderKey,
@@ -31,8 +21,7 @@ import {
   note,
   turn,
 } from "@/server/db/schema"
-
-export type BotPicture = { data: Buffer; type: string }
+import type { BlobStore, StoredBlob } from "@/server/ports/blob-store"
 
 export type BotInput = Omit<BotFormInput, "providerKeyId">
 
@@ -48,9 +37,7 @@ async function resolveKeyId(
   return row.id
 }
 
-const hasPicture = isNotNull(bot.picture)
-
-const openTurn = and(eq(turn.botId, bot.id), isNull(turn.endedAt))
+const hasPicture = isNotNull(bot.pictureKey)
 
 export async function listBots(userId: string) {
   return db
@@ -60,15 +47,7 @@ export async function listBots(userId: string) {
       job: bot.job,
       hasPicture: sql<boolean>`${hasPicture}`,
       updatedAt: bot.updatedAt,
-      working: sql<boolean>`${exists(
-        db
-          .select({ id: turn.id })
-          .from(turn)
-          .where(and(openTurn, not(awaitsAnswer)))
-      )}`,
-      needsYou: sql<boolean>`${exists(
-        db.select({ id: turn.id }).from(turn).where(and(openTurn, awaitsAnswer))
-      )}`,
+      ...openTurnStatus(eq(turn.botId, bot.id)),
     })
     .from(bot)
     .where(eq(bot.userId, userId))
@@ -109,12 +88,16 @@ export async function findBot(userId: string, id: string) {
   return { ...rest, askBefore: askBeforeFrom(toolPolicies) }
 }
 
-export async function findBotPicture(userId: string, id: string) {
+export async function findBotPicture(
+  blobs: BlobStore,
+  userId: string,
+  id: string
+) {
   const [row] = await db
-    .select({ data: bot.picture, type: bot.pictureType })
+    .select({ key: bot.pictureKey })
     .from(bot)
-    .where(and(eq(bot.id, id), eq(bot.userId, userId), hasPicture))
-  return row?.data && row.type ? { data: row.data, type: row.type } : null
+    .where(and(eq(bot.id, id), eq(bot.userId, userId)))
+  return row?.key ? blobs.get(row.key) : null
 }
 
 function columnsFrom(input: BotInput) {
@@ -131,11 +114,12 @@ function policyRows(botId: string, askBefore: Record<ToolGroup, boolean>) {
 }
 
 export async function insertBot(
+  blobs: BlobStore,
   userId: string,
   id: string,
   input: BotInput,
   key: BotKey,
-  picture: BotPicture | null
+  picture: StoredBlob | null
 ) {
   await db.transaction(async (tx) => {
     await tx.insert(bot).values({
@@ -143,34 +127,34 @@ export async function insertBot(
       providerKeyId: await resolveKeyId(tx, userId, key),
       id,
       userId,
-      picture: picture?.data ?? null,
-      pictureType: picture?.type ?? null,
+      pictureKey: picture && blobKeys.picture(id),
     })
     await tx.insert(botToolPolicy).values(policyRows(id, input.askBefore))
   })
+  if (picture) await blobs.put(blobKeys.picture(id), picture)
 }
 
 export async function updateBot(
+  blobs: BlobStore,
   userId: string,
   id: string,
   input: BotInput,
   key: BotKey,
-  picture: BotPicture | null | undefined
+  picture: StoredBlob | null | undefined
 ) {
-  return db.transaction(async (tx) => {
-    const exists = await tx
+  const updated = await db.transaction(async (tx) => {
+    const [owned] = await tx
       .select({ id: bot.id })
       .from(bot)
       .where(and(eq(bot.id, id), eq(bot.userId, userId)))
-    if (exists.length === 0) return false
+    if (!owned) return false
     await tx
       .update(bot)
       .set({
         ...columnsFrom(input),
         providerKeyId: await resolveKeyId(tx, userId, key),
         ...(picture !== undefined && {
-          picture: picture?.data ?? null,
-          pictureType: picture?.type ?? null,
+          pictureKey: picture && blobKeys.picture(id),
         }),
       })
       .where(and(eq(bot.id, id), eq(bot.userId, userId)))
@@ -183,11 +167,14 @@ export async function updateBot(
       })
     return true
   })
+  if (updated && picture) await blobs.put(blobKeys.picture(id), picture)
+  if (updated && picture === null) await blobs.delete([blobKeys.picture(id)])
+  return updated
 }
 
-export async function deleteBot(userId: string, id: string) {
-  return db.transaction(async (tx) => {
-    await tx
+export async function deleteBot(blobs: BlobStore, userId: string, id: string) {
+  const deleted = await db.transaction(async (tx) => {
+    const chats = await tx
       .delete(chat)
       .where(
         and(
@@ -201,10 +188,17 @@ export async function deleteBot(userId: string, id: string) {
           )
         )
       )
+      .returning({ id: chat.id })
     const rows = await tx
       .delete(bot)
       .where(and(eq(bot.id, id), eq(bot.userId, userId)))
       .returning({ id: bot.id })
-    return rows.length > 0
+    return rows.length > 0 ? chats : null
   })
+  if (!deleted) return false
+  await Promise.all([
+    blobs.deletePrefix(blobKeys.teammate(id)),
+    ...deleted.map((row) => blobs.deletePrefix(blobKeys.chat(row.id))),
+  ])
+  return true
 }

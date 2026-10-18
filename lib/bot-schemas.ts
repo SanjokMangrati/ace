@@ -9,8 +9,6 @@ import { bot, toolGroup } from "@/server/db/schema/bots"
 const BOT_NAME_MAX_LENGTH = 40
 const BOT_JOB_MAX_LENGTH = 120
 const BOT_INSTRUCTIONS_MAX_LENGTH = 4000
-export const MAX_STEPS_LIMIT = 500
-const BUDGET_MAX_USD = 1000
 export const PICTURE_MAX_BYTES = 256 * 1024
 export const PICTURE_TYPES = [
   "image/png",
@@ -52,94 +50,123 @@ export function askBeforeFrom(
   return askBefore
 }
 
-function budget(label: string) {
+export type TeammateLimits = {
+  maxSteps: number
+  taskBudgetUsd: number
+  dailyBudgetUsd: number
+}
+
+export const LIMIT_CEILINGS: TeammateLimits = {
+  maxSteps: 500,
+  taskBudgetUsd: 1000,
+  dailyBudgetUsd: 1000,
+}
+
+export const DEFAULT_LIMITS: TeammateLimits = {
+  maxSteps: 50,
+  taskBudgetUsd: 1,
+  dailyBudgetUsd: 5,
+}
+
+export function cappedLimits(
+  limits: TeammateLimits,
+  caps: TeammateLimits
+): TeammateLimits {
+  return {
+    maxSteps: Math.min(limits.maxSteps, caps.maxSteps),
+    taskBudgetUsd: Math.min(limits.taskBudgetUsd, caps.taskBudgetUsd),
+    dailyBudgetUsd: Math.min(limits.dailyBudgetUsd, caps.dailyBudgetUsd),
+  }
+}
+
+function budget(label: string, maxUsd: number) {
   return z
     .number({ error: `Enter an amount for ${label}, like 1.00.` })
     .min(0.01, `Spend at least $0.01 ${label}.`)
-    .max(BUDGET_MAX_USD, `Keep it at $${BUDGET_MAX_USD} or less ${label}.`)
+    .max(maxUsd, `Keep it at $${maxUsd} or less ${label}.`)
 }
 
-export const botFormSchema = createInsertSchema(bot, {
-  name: (schema) =>
-    schema
-      .trim()
-      .min(1, "Give your teammate a name.")
-      .max(
-        BOT_NAME_MAX_LENGTH,
-        `Keep the name to ${BOT_NAME_MAX_LENGTH} characters or fewer.`
-      ),
-  job: (schema) =>
-    schema
-      .trim()
-      .min(1, "Say in a few words what this teammate does.")
-      .max(
-        BOT_JOB_MAX_LENGTH,
-        `Keep the job to ${BOT_JOB_MAX_LENGTH} characters or fewer.`
-      ),
-  instructions: (schema) =>
-    schema
-      .trim()
-      .max(
-        BOT_INSTRUCTIONS_MAX_LENGTH,
-        `Keep the instructions to ${BOT_INSTRUCTIONS_MAX_LENGTH} characters or fewer.`
-      ),
-  modelId: (schema) =>
-    schema
-      .trim()
-      .min(1, "Pick a model.")
-      .max(200, "That model name is too long."),
-  maxSteps: () =>
-    z
-      .number({ error: "Enter a number of steps, like 50." })
-      .int("Use a whole number of steps.")
-      .min(1, "Allow at least 1 step.")
-      .max(MAX_STEPS_LIMIT, `Keep it at ${MAX_STEPS_LIMIT} steps or fewer.`),
-  taskBudgetUsd: () => budget("on one task"),
-  dailyBudgetUsd: () => budget("a day"),
-})
-  .pick({
-    name: true,
-    job: true,
-    instructions: true,
-    providerKeyId: true,
-    modelId: true,
-    fullAuto: true,
-    maxSteps: true,
-    taskBudgetUsd: true,
-    dailyBudgetUsd: true,
+export function botFormSchema(caps = LIMIT_CEILINGS) {
+  return createInsertSchema(bot, {
+    name: (schema) =>
+      schema
+        .trim()
+        .min(1, "Give your teammate a name.")
+        .max(
+          BOT_NAME_MAX_LENGTH,
+          `Keep the name to ${BOT_NAME_MAX_LENGTH} characters or fewer.`
+        ),
+    job: (schema) =>
+      schema
+        .trim()
+        .min(1, "Say in a few words what this teammate does.")
+        .max(
+          BOT_JOB_MAX_LENGTH,
+          `Keep the job to ${BOT_JOB_MAX_LENGTH} characters or fewer.`
+        ),
+    instructions: (schema) =>
+      schema
+        .trim()
+        .max(
+          BOT_INSTRUCTIONS_MAX_LENGTH,
+          `Keep the instructions to ${BOT_INSTRUCTIONS_MAX_LENGTH} characters or fewer.`
+        ),
+    modelId: (schema) =>
+      schema
+        .trim()
+        .min(1, "Pick a model.")
+        .max(200, "That model name is too long."),
+    maxSteps: () =>
+      z
+        .number({ error: "Enter a number of steps, like 50." })
+        .int("Use a whole number of steps.")
+        .min(1, "Allow at least 1 step.")
+        .max(caps.maxSteps, `Keep it at ${caps.maxSteps} steps or fewer.`),
+    taskBudgetUsd: () => budget("on one task", caps.taskBudgetUsd),
+    dailyBudgetUsd: () => budget("a day", caps.dailyBudgetUsd),
   })
-  .required()
-  .extend({
-    providerKeyId: z.uuid({ error: PICK_PROVIDER_MESSAGE }),
-    askBefore: z.object(
-      Object.fromEntries(TOOL_GROUPS.map((tool) => [tool, z.boolean()])) as {
-        [K in ToolGroup]: z.ZodBoolean
-      }
-    ),
-  })
+    .pick({
+      name: true,
+      job: true,
+      instructions: true,
+      providerKeyId: true,
+      modelId: true,
+      fullAuto: true,
+      maxSteps: true,
+      taskBudgetUsd: true,
+      dailyBudgetUsd: true,
+    })
+    .required()
+    .extend({
+      providerKeyId: z.uuid({ error: PICK_PROVIDER_MESSAGE }),
+      askBefore: z.record(z.enum(TOOL_GROUPS), z.boolean()),
+    })
+}
 
-export type BotFormInput = z.infer<typeof botFormSchema>
+export type BotFormInput = z.infer<ReturnType<typeof botFormSchema>>
 
 export const NEW_KEY = "new"
 
-export const teammateFormSchema = botFormSchema
-  .extend({
-    providerKeyId: z.union(
-      [
-        z.uuid({ error: PICK_PROVIDER_MESSAGE }),
-        z.literal(NEW_KEY, { error: PICK_PROVIDER_MESSAGE }),
-      ],
-      { error: PICK_PROVIDER_MESSAGE }
-    ),
-    newKey: providerKeyFieldsSchema,
-  })
-  .superRefine((value, ctx) => {
-    if (value.providerKeyId === NEW_KEY) {
-      checkProviderKey(value.newKey, ctx, ["newKey"])
-    }
-  })
+export function teammateFormSchema(caps = LIMIT_CEILINGS) {
+  return botFormSchema(caps)
+    .extend({
+      providerKeyId: z.union(
+        [
+          z.uuid({ error: PICK_PROVIDER_MESSAGE }),
+          z.literal(NEW_KEY, { error: PICK_PROVIDER_MESSAGE }),
+        ],
+        { error: PICK_PROVIDER_MESSAGE }
+      ),
+      newKey: providerKeyFieldsSchema,
+    })
+    .superRefine((value, ctx) => {
+      if (value.providerKeyId === NEW_KEY) {
+        checkProviderKey(value.newKey, ctx, ["newKey"])
+      }
+    })
+}
 
-export type TeammateFormInput = z.infer<typeof teammateFormSchema>
+export type TeammateFormInput = z.infer<ReturnType<typeof teammateFormSchema>>
 
 export const ADVANCED_FIELDS = [
   "fullAuto",

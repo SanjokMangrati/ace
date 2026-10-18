@@ -14,17 +14,15 @@ export type CatalogModel = {
 
 export type ProviderModels = Record<Provider, CatalogModel[]>
 
-export const PROVIDER_INFO: Record<Provider, { label: string }> = {
-  anthropic: { label: "Anthropic" },
-  openai: { label: "OpenAI" },
-  google: { label: "Google" },
-  openai_compatible: { label: "Other" },
+export const PROVIDER_LABELS: Record<Provider, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+  openai_compatible: "Other",
 }
 
 export function providerLabel(provider: Provider) {
-  return provider === "openai_compatible"
-    ? "Custom"
-    : PROVIDER_INFO[provider].label
+  return provider === "openai_compatible" ? "Custom" : PROVIDER_LABELS[provider]
 }
 
 export function defaultModelId(models: readonly CatalogModel[]) {
