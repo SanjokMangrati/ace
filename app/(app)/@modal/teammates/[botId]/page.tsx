@@ -34,8 +34,10 @@ export async function generateMetadata({
 
 export default async function TeammatePage({
   params,
+  searchParams,
 }: PageProps<"/teammates/[botId]">) {
   const { user, bot } = await loadBot((await params).botId)
+  const { show } = await searchParams
   const [keys, models] = await Promise.all([
     listProviderKeys(user.id).then((rows) => rows.map(providerKeyOption)),
     modelCatalog.listAll(),
@@ -43,7 +45,11 @@ export default async function TeammatePage({
   const picture = teammatePictureUrl(bot)
 
   return (
-    <RouteModal fallback="/teammates" className="sm:max-w-180">
+    <RouteModal
+      fallback="/teammates"
+      focusId={show === "limits" ? "maxSteps" : undefined}
+      className="sm:max-w-180"
+    >
       <TeammateForm
         key={bot.updatedAt.getTime()}
         mode="edit"
@@ -54,6 +60,7 @@ export default async function TeammatePage({
         models={models}
         allowCustom={env.ALLOW_CUSTOM_BASE_URL}
         limits={teammateCaps}
+        showAdvanced={show === "limits"}
         defaultValues={{
           name: bot.name,
           job: bot.job,

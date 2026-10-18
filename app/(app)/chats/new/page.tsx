@@ -4,6 +4,7 @@ import { Page, PageHeader } from "@/components/app/page"
 import { NewChatForm } from "@/components/chat/new-chat-form"
 import { teammatePictureUrl } from "@/lib/format"
 import { listBots } from "@/server/db/queries/bots"
+import { listProviderKeyModels } from "@/server/provider-key-models"
 import { requireUser } from "@/server/session"
 
 export const metadata: Metadata = {
@@ -14,7 +15,10 @@ export default async function NewChatPage({
   searchParams,
 }: PageProps<"/chats/new">) {
   const user = await requireUser()
-  const bots = await listBots(user.id)
+  const [bots, providerKeys] = await Promise.all([
+    listBots(user.id),
+    listProviderKeyModels(user.id),
+  ])
   if (bots.length === 0) redirect("/")
   const { teammate } = await searchParams
   const picked = bots.find((bot) => bot.id === teammate) ?? bots[0]
@@ -38,7 +42,14 @@ export default async function NewChatPage({
           name: bot.name,
           job: bot.job,
           picture: teammatePictureUrl(bot),
+          model: {
+            providerKeyId: bot.providerKeyId,
+            modelId: bot.modelId,
+            defaultProviderKeyId: bot.providerKeyId,
+            defaultModelId: bot.modelId,
+          },
         }))}
+        providerKeys={providerKeys}
       />
     </Page>
   )

@@ -1,6 +1,11 @@
 import { createInsertSchema } from "drizzle-zod"
 import { z } from "zod"
-import { PROVIDER_LABELS, type Provider } from "@/lib/models"
+import {
+  MODEL_ID_MAX_LENGTH,
+  MODEL_ID_TOO_LONG,
+  PROVIDER_LABELS,
+  type Provider,
+} from "@/lib/models"
 import { providerKey } from "@/server/db/schema/bots"
 
 const API_KEY_MIN_LENGTH = 20
@@ -11,7 +16,7 @@ const httpUrlSchema = z.url({ protocol: /^https?$/ })
 export const providerKeyFieldsSchema = createInsertSchema(providerKey, {
   baseUrl: (schema) => schema.trim().max(500, "That address is too long."),
   judgeModelId: (schema) =>
-    schema.trim().max(200, "That model name is too long."),
+    schema.trim().max(MODEL_ID_MAX_LENGTH, MODEL_ID_TOO_LONG),
 })
   .pick({ provider: true, baseUrl: true, judgeModelId: true })
   .extend({

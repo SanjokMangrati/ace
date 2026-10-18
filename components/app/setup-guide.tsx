@@ -19,7 +19,7 @@ function Step({
   action?: React.ReactNode
 }) {
   return (
-    <div className="flex items-center gap-3.5 rounded-md bg-surface px-4 py-3.5 shadow-card">
+    <div className="flex items-center gap-3 rounded-md bg-surface px-4 py-3 shadow-card">
       <span
         className={cn(
           "grid size-7.5 shrink-0 place-items-center rounded-full bg-fill font-display text-small font-semibold",

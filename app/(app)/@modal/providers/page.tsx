@@ -37,7 +37,7 @@ export default async function ProvidersModal() {
           pick it in each teammate's settings.
         </DialogDescription>
       </DialogHeader>
-      <DialogBody className="flex flex-col gap-6">
+      <DialogBody className="flex flex-col gap-5">
         <Section id="s-keys" title="Your keys">
           {rows.length > 0 && <ProviderKeyList rows={rows} />}
           <Alert role="note">

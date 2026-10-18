@@ -47,6 +47,8 @@ export async function listBots(userId: string) {
       job: bot.job,
       hasPicture: sql<boolean>`${hasPicture}`,
       updatedAt: bot.updatedAt,
+      providerKeyId: bot.providerKeyId,
+      modelId: bot.modelId,
       ...openTurnStatus(eq(turn.botId, bot.id)),
     })
     .from(bot)

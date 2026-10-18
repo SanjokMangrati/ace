@@ -5,8 +5,10 @@ import { db } from "@/server/db/client"
 import * as schema from "@/server/db/schema"
 import {
   endRunningTurns,
+  findChat,
   findChatBotIds,
   findChatTeam,
+  findTeammate,
   insertChat,
   insertHandoff,
   listChats,
@@ -15,6 +17,7 @@ import {
   pauseTurn,
   resumeTurn,
   saveTranscript,
+  setChatModel,
   startTurn,
 } from "./chats"
 import { askApproval, toolCallLedger } from "./tool-calls"
@@ -51,7 +54,7 @@ beforeAll(async () => {
     })
     .returning({ id: schema.bot.id })
   botId = bot.id
-  await insertChat("user-1", { id: chatId, botIds: [botId], title: "Hi" })
+  await insertChat("user-1", { id: chatId, botIds: [botId], message: "Hi" })
 })
 
 describe("transcript storage", () => {
@@ -270,14 +273,14 @@ describe("group chats", () => {
       await insertChat("user-2", {
         id: groupId,
         botIds: [botId],
-        title: "Offsite",
+        message: "Offsite",
       })
     ).toBe(false)
     expect(
       await insertChat("user-1", {
         id: groupId,
         botIds: [writerId, botId],
-        title: "Offsite",
+        message: "Offsite",
       })
     ).toBe(true)
     const team = await findChatTeam(groupId)
@@ -319,5 +322,102 @@ describe("group chats", () => {
     expect(await listHops(groupId, "u1")).toEqual([
       { fromBotId: botId, toBotId: writerId },
     ])
+  })
+})
+
+describe("chat model", () => {
+  let defaultKeyId: string
+  let otherKeyId: string
+
+  beforeAll(async () => {
+    const [defaultKey, otherKey] = await db
+      .insert(schema.providerKey)
+      .values([
+        { userId: "user-1", provider: "anthropic" },
+        { userId: "user-1", provider: "openai" },
+      ])
+      .returning({ id: schema.providerKey.id })
+    defaultKeyId = defaultKey.id
+    otherKeyId = otherKey.id
+    await db
+      .update(schema.bot)
+      .set({ providerKeyId: defaultKeyId })
+      .where(eq(schema.bot.id, botId))
+  })
+
+  async function used() {
+    const teammate = await findTeammate(chatId, botId)
+    const chat = await findChat("user-1", chatId)
+    return {
+      provider: teammate?.providerKey?.provider,
+      modelId: teammate?.modelId,
+      shown: chat?.bots[0].model,
+    }
+  }
+
+  it("uses the teammate's model until you pick another for this chat", async () => {
+    expect(await used()).toEqual({
+      provider: "anthropic",
+      modelId: "m",
+      shown: {
+        providerKeyId: defaultKeyId,
+        modelId: "m",
+        defaultProviderKeyId: defaultKeyId,
+        defaultModelId: "m",
+      },
+    })
+
+    await setChatModel(chatId, botId, {
+      providerKeyId: otherKeyId,
+      modelId: "gpt",
+    })
+    expect(await used()).toMatchObject({
+      provider: "openai",
+      modelId: "gpt",
+      shown: { providerKeyId: otherKeyId, modelId: "gpt" },
+    })
+  })
+
+  it("follows the teammate again when you pick its own model", async () => {
+    await setChatModel(chatId, botId, {
+      providerKeyId: defaultKeyId,
+      modelId: "m",
+    })
+    const [member] = await db
+      .select({
+        providerKeyId: schema.chatMember.providerKeyId,
+        modelId: schema.chatMember.modelId,
+      })
+      .from(schema.chatMember)
+      .where(eq(schema.chatMember.chatId, chatId))
+    expect(member).toEqual({ providerKeyId: null, modelId: null })
+  })
+
+  it("keeps the model you picked when you start a chat", async () => {
+    const startedId = "00000000-0000-4000-8000-000000000003"
+    await insertChat("user-1", {
+      id: startedId,
+      botIds: [botId],
+      message: "Picked",
+      models: { [botId]: { providerKeyId: otherKeyId, modelId: "gpt" } },
+    })
+    const teammate = await findTeammate(startedId, botId)
+    expect(teammate?.providerKey?.provider).toBe("openai")
+    expect(teammate?.modelId).toBe("gpt")
+  })
+
+  it("falls back to the teammate's model when the chat's AI provider is deleted", async () => {
+    await setChatModel(chatId, botId, {
+      providerKeyId: otherKeyId,
+      modelId: "gpt",
+    })
+    await db
+      .delete(schema.providerKey)
+      .where(eq(schema.providerKey.id, otherKeyId))
+    expect(await used()).toMatchObject({
+      provider: "anthropic",
+      modelId: "m",
+      shown: { providerKeyId: defaultKeyId, modelId: "m" },
+    })
   })
 })

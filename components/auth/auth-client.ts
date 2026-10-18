@@ -13,6 +13,9 @@ export function authErrorMessage(error: AuthClientError) {
   if (error.status === 429) {
     return "Too many attempts. Wait a moment and try again."
   }
+  if (error.code === "INVALID_EMAIL_OR_PASSWORD") {
+    return "That email and password don't match an account. Check both and try again."
+  }
   if (error.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL") {
     return "We couldn't create your account. Try signing in or use a different email."
   }

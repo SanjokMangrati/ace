@@ -89,11 +89,30 @@ async function toCatalogModel(
   if (!direct) return undefined
   return {
     id: nativeModelId(provider, model),
-    label: model.name,
+    label: model.name.trim(),
     vision: direct.tags.includes("vision"),
     inputUsdPerMTok: direct.pricing.prompt * 1_000_000,
     outputUsdPerMTok: direct.pricing.completion * 1_000_000,
   }
+}
+
+function variantName(suffix: string) {
+  return suffix
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+function withDistinctLabels(models: CatalogModel[]) {
+  return models.map((model) => {
+    const base = models.find(
+      (other) =>
+        other.label === model.label && model.id.startsWith(`${other.id}-`)
+    )
+    if (!base) return model
+    const variant = variantName(model.id.slice(base.id.length + 1))
+    return { ...model, label: `${model.label} ${variant}` }
+  })
 }
 
 async function list(provider: Provider) {
@@ -101,7 +120,7 @@ async function list(provider: Provider) {
   const models = await Promise.all(
     (await candidates(provider)).map((model) => toCatalogModel(provider, model))
   )
-  return models.filter((model) => model !== undefined)
+  return withDistinctLabels(models.filter((model) => model !== undefined))
 }
 
 export function createAiGatewayCatalog(): ModelCatalog {

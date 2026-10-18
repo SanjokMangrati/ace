@@ -2,12 +2,14 @@ import { chat } from "@trigger.dev/sdk/ai"
 import { convertToModelMessages, type ModelMessage, type ToolSet } from "ai"
 import { cappedLimits } from "@/lib/bot-schemas"
 import {
+  controlMessage,
   type HandoffEvent,
   handoffMessage,
   nextTeammate,
   TEAMMATE_CHAT_TASK,
   type TeammateMessage,
 } from "@/lib/chat"
+import { chatActionSchema } from "@/lib/chat-schemas"
 import { DAY_MS } from "@/lib/format"
 import { type CatalogModel, type Provider, providerLabel } from "@/lib/models"
 import { createAiGatewayCatalog } from "@/server/adapters/ai-gateway"
@@ -301,8 +303,15 @@ export const teammateChat = chat
       ...handoffTools(passTask),
       computer: computerTool(historyComputer),
     },
+    actionSchema: chatActionSchema,
     onBoot: () => {
       turn.init({ current: null })
+    },
+    onAction: ({ action }) => {
+      chat.history.set([
+        ...chat.history.all(),
+        controlMessage(action.messageId, action.control),
+      ])
     },
     onFailure: async ({ payload, error }) => {
       log.error("Chat run failed", { chatId: payload.chatId, err: error })
@@ -318,6 +327,7 @@ export const teammateChat = chat
       const resumed =
         answers.length > 0 ? await resumeTurn(chatId, answers) : null
       const teammate = await findTeammate(
+        chatId,
         resumed?.botId ??
           nextTeammate(
             history.findLast((message) => message.role === "user"),
@@ -436,9 +446,10 @@ export const teammateChat = chat
           ? model
           : await modelCatalog.find(key.provider, judgeModelId)
       const decided = resumed?.decided ?? []
-      const unshownAnswers = decided.map(({ toolCallId, at }) => ({
+      const unshownAnswers = decided.map(({ toolCallId, at, askedAt }) => ({
         toolCallId,
         at,
+        askedAt,
       }))
       const transcript = group
         ? await convertToModelMessages(teamView(history, bot.id, team.bots), {

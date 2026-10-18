@@ -17,7 +17,7 @@ const tileVariants = cva(
         sun: "bg-sun",
       },
       size: {
-        default: "size-9.5 rounded-tile",
+        default: "size-8.5 rounded-tile",
         xs: "size-6.5 rounded-tile-xs",
       },
     },

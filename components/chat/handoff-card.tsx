@@ -24,7 +24,7 @@ export function HandoffCard({
     handoff.summary.length + handoff.nextStep.length > SHORT_NOTE_CHARS
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-md border-1.5 border-dashed border-line-strong px-4 py-3.5">
+    <div className="flex flex-col gap-2.5 rounded-md border-1.5 border-dashed border-line-strong px-4 py-3">
       <p className="flex flex-wrap items-center gap-2 text-ink-2">
         <TeammateAvatar
           botId={from.id}

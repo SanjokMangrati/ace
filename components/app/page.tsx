@@ -44,7 +44,7 @@ export function Page({
         >
           <div
             className={cn(
-              "mx-auto flex h-14 w-full items-center gap-3 px-4 sm:px-6",
+              "mx-auto flex h-12 w-full items-center gap-3 px-4 sm:px-6",
               width
             )}
           >
@@ -59,8 +59,8 @@ export function Page({
       )}
       <div
         className={cn(
-          "mx-auto flex w-full flex-col gap-6 px-4 pb-16 sm:px-6",
-          title ? "pt-2" : "pt-8",
+          "mx-auto flex w-full flex-col gap-5 px-4 pb-12 sm:px-6",
+          title ? "pt-1" : "pt-6",
           width
         )}
       >
@@ -85,7 +85,7 @@ export function PageHeader({
       <div>
         <h1 className="font-display text-title-lg">{title}</h1>
         {description && (
-          <p className="mt-1.5 max-w-intro text-ink-2">{description}</p>
+          <p className="mt-1 max-w-intro text-ink-2">{description}</p>
         )}
       </div>
       {action}
@@ -107,7 +107,7 @@ export function Section({
   children: React.ReactNode
 }) {
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-3.5">
+    <section aria-labelledby={id} className="flex flex-col gap-3">
       <Heading
         id={id}
         className={hideTitle ? "sr-only" : "font-display text-title"}

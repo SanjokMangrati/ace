@@ -25,10 +25,12 @@ export function ModalHistoryProvider({
 
 export function RouteModal({
   fallback,
+  focusId,
   className,
   children,
 }: {
   fallback: string
+  focusId?: string
   className?: string
   children: React.ReactNode
 }) {
@@ -49,7 +51,10 @@ export function RouteModal({
         if (!isOpen) leave()
       }}
     >
-      <DialogContent className={className}>
+      <DialogContent
+        className={className}
+        initialFocus={focusId ? () => document.getElementById(focusId) : true}
+      >
         <ModalContext value={() => setOpen(false)}>{children}</ModalContext>
       </DialogContent>
     </Dialog>

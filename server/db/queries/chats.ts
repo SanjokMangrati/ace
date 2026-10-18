@@ -17,7 +17,8 @@ import {
   sum,
 } from "drizzle-orm"
 import { askBeforeFrom } from "@/lib/bot-schemas"
-import type { TeammateMessage } from "@/lib/chat"
+import { chatTitle, type TeammateMessage } from "@/lib/chat"
+import type { PickedModel } from "@/lib/chat-schemas"
 import type { ApprovalAnswer } from "@/server/agent/approvals"
 import { blobKeys } from "@/server/blob-keys"
 import { db, type Tx } from "@/server/db/client"
@@ -28,6 +29,7 @@ import {
   chatMember,
   handoff,
   message,
+  providerKey,
   type RuntimeCursors,
   sandbox,
   sandboxWaiter,
@@ -90,14 +92,24 @@ const botColumns = {
   updatedAt: bot.updatedAt,
 }
 
+const chatKeyId = sql<
+  string | null
+>`coalesce(${chatMember.providerKeyId}, ${bot.providerKeyId})`
+
 async function listMembers(chatIds: string[]) {
   const rows = await db
     .select({
       chatId: chatMember.chatId,
       ...botColumns,
       job: bot.job,
-      connected: sql<boolean>`${isNotNull(bot.providerKeyId)}`,
+      connected: sql<boolean>`${chatKeyId} is not null`,
       fullAuto: bot.fullAuto,
+      model: {
+        providerKeyId: chatKeyId,
+        modelId: sql<string>`case when ${chatMember.providerKeyId} is null then ${bot.modelId} else ${chatMember.modelId} end`,
+        defaultProviderKeyId: bot.providerKeyId,
+        defaultModelId: bot.modelId,
+      },
     })
     .from(chatMember)
     .innerJoin(bot, eq(bot.id, chatMember.botId))
@@ -124,6 +136,17 @@ export async function listChats(userId: string) {
     .orderBy(desc(chat.updatedAt))
   const membersOf = await listMembers(rows.map((row) => row.id))
   return rows.map((row) => ({ ...row, bots: membersOf(row.id) }))
+}
+
+export function listChatStatuses(userId: string, ids: string[]) {
+  return db
+    .select({
+      id: chat.id,
+      ...openTurnStatus(eq(turn.chatId, chat.id)),
+      queued: sql<boolean>`${queued}`,
+    })
+    .from(chat)
+    .where(and(eq(chat.userId, userId), inArray(chat.id, ids)))
 }
 
 async function lastTurnBotId(chatId: string) {
@@ -178,23 +201,52 @@ export async function listBotChatIds(userId: string, botId: string) {
   return rows.map((row) => row.id)
 }
 
+function chatModelColumns(
+  saved: { providerKeyId: string | null; modelId: string } | undefined,
+  picked: PickedModel | undefined
+) {
+  const isDefault =
+    !picked ||
+    (saved?.providerKeyId === picked.providerKeyId &&
+      saved.modelId === picked.modelId)
+  return isDefault ? { providerKeyId: null, modelId: null } : picked
+}
+
 export async function insertChat(
   userId: string,
-  values: { id: string; botIds: string[]; title: string }
+  values: {
+    id: string
+    botIds: string[]
+    message: string
+    models?: Record<string, PickedModel>
+  }
 ) {
-  const { botIds, ...row } = values
-  const owned = await db.$count(
-    bot,
-    and(inArray(bot.id, botIds), eq(bot.userId, userId))
-  )
-  if (owned !== botIds.length) return false
+  const { id, botIds, message, models = {} } = values
+  const owned = await db
+    .select({
+      id: bot.id,
+      name: bot.name,
+      providerKeyId: bot.providerKeyId,
+      modelId: bot.modelId,
+    })
+    .from(bot)
+    .where(and(inArray(bot.id, botIds), eq(bot.userId, userId)))
+  if (owned.length !== botIds.length) return false
   await db.transaction(async (tx) => {
-    await tx.insert(chat).values({ ...row, userId })
     await tx
-      .insert(chatMember)
-      .values(
-        botIds.map((botId, position) => ({ chatId: row.id, botId, position }))
-      )
+      .insert(chat)
+      .values({ id, userId, title: chatTitle(message, owned) })
+    await tx.insert(chatMember).values(
+      botIds.map((botId, position) => ({
+        chatId: id,
+        botId,
+        position,
+        ...chatModelColumns(
+          owned.find((saved) => saved.id === botId),
+          models[botId]
+        ),
+      }))
+    )
   })
   return true
 }
@@ -217,8 +269,52 @@ export async function findChatTeam(chatId: string) {
   return { bots: membersOf(chatId), lastBotId }
 }
 
-export async function findTeammate(botId: string) {
-  const row = await db.query.bot.findFirst({
+async function findChatModel(chatId: string, botId: string) {
+  const [row] = await db
+    .select({
+      modelId: chatMember.modelId,
+      providerKey: {
+        provider: providerKey.provider,
+        baseUrl: providerKey.baseUrl,
+        sealedKey: providerKey.sealedKey,
+        judgeModelId: providerKey.judgeModelId,
+      },
+    })
+    .from(chatMember)
+    .innerJoin(providerKey, eq(providerKey.id, chatMember.providerKeyId))
+    .where(and(eq(chatMember.chatId, chatId), eq(chatMember.botId, botId)))
+  return row?.modelId
+    ? { modelId: row.modelId, providerKey: row.providerKey }
+    : undefined
+}
+
+export async function setChatModel(
+  chatId: string,
+  botId: string,
+  model: PickedModel
+) {
+  const [saved] = await db
+    .select({ providerKeyId: bot.providerKeyId, modelId: bot.modelId })
+    .from(bot)
+    .where(eq(bot.id, botId))
+  await db
+    .update(chatMember)
+    .set(chatModelColumns(saved, model))
+    .where(and(eq(chatMember.chatId, chatId), eq(chatMember.botId, botId)))
+}
+
+export async function findTeammate(chatId: string, botId: string) {
+  const [row, chatModel] = await Promise.all([
+    findBotForTurn(botId),
+    findChatModel(chatId, botId),
+  ])
+  if (!row) return null
+  const { toolPolicies, ...rest } = row
+  return { ...rest, ...chatModel, askBefore: askBeforeFrom(toolPolicies) }
+}
+
+function findBotForTurn(botId: string) {
+  return db.query.bot.findFirst({
     where: eq(bot.id, botId),
     columns: {
       id: true,
@@ -248,9 +344,6 @@ export async function findTeammate(botId: string) {
       },
     },
   })
-  if (!row) return null
-  const { toolPolicies, ...rest } = row
-  return { ...rest, askBefore: askBeforeFrom(toolPolicies) }
 }
 
 export async function listHops(chatId: string, userMessageId: string) {
@@ -478,19 +571,23 @@ export async function resumeTurn(chatId: string, answers: ApprovalAnswer[]) {
       .for("update")
     if (!open) return null
     const decidedAt = new Date()
-    const decided: (ApprovalAnswer & { at: number })[] = []
+    const decided: (ApprovalAnswer & { at: number; askedAt: number })[] = []
     for (const answer of answers) {
       const call = and(
         eq(approval.turnId, open.id),
         eq(approval.toolCallId, answer.toolCallId)
       )
-      const rows = await tx
+      const [row] = await tx
         .update(approval)
         .set({ status: answer.approved ? "approved" : "denied", decidedAt })
         .where(and(call, eq(approval.status, "pending")))
-        .returning({ toolCallId: approval.toolCallId })
-      if (rows.length === 0) continue
-      decided.push({ ...answer, at: decidedAt.getTime() })
+        .returning({ createdAt: approval.createdAt })
+      if (!row) continue
+      decided.push({
+        ...answer,
+        at: decidedAt.getTime(),
+        askedAt: row.createdAt.getTime(),
+      })
       if (!answer.approved) {
         await tx
           .update(toolCall)

@@ -225,7 +225,7 @@ async function addBot(name: string, modelId: string, asksBeforeShell = false) {
 
 async function addChat(botIds: string[]) {
   const id = crypto.randomUUID()
-  await insertChat("user-1", { id, botIds, title: "Q3 vendor spend" })
+  await insertChat("user-1", { id, botIds, message: "Q3 vendor spend" })
   return id
 }
 
@@ -413,6 +413,32 @@ describe("take control", () => {
         data: { tookAt: expect.any(Number), gaveAt: expect.any(Number) },
       }),
     ])
+  })
+
+  it("records control you took while it was idle without starting a turn", async () => {
+    const botId = await addBot("Researcher", "seer")
+    const chatId = await addChat([botId])
+    const seer = script("seer", [])
+    const messageId = crypto.randomUUID()
+    const control = { tookAt: 1, gaveAt: 2, botId }
+
+    await open(chatId).sendAction({
+      type: "gave-back-control",
+      messageId,
+      control,
+    })
+
+    await until(async () => (await loadTranscript(chatId)).messages.length > 0)
+    const { messages } = await loadTranscript<TeammateMessage>(chatId)
+    expect(messages).toEqual([
+      expect.objectContaining({
+        id: messageId,
+        role: "user",
+        metadata: { createdAt: 2, control },
+      }),
+    ])
+    expect(await turns(chatId)).toEqual([])
+    expect(seer.doStreamCalls).toHaveLength(0)
   })
 })
 

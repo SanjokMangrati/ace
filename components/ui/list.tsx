@@ -18,7 +18,7 @@ function ListRow({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="list-row"
-      className={cn("flex items-center gap-3.5 px-4.5 py-3.5", className)}
+      className={cn("flex items-center gap-3 px-4 py-3", className)}
       {...props}
     />
   )

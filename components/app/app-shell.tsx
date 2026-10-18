@@ -11,9 +11,10 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { DAY_MS } from "@/lib/format"
 import type { AuthUser } from "@/server/ports/auth"
 import { AppSidebar, type SidebarChat } from "./app-sidebar"
-import { LiveChatProvider } from "./live-chat"
+import { ChatStatusSync, LiveChatProvider } from "./live-chat"
 import { ModalHistoryProvider } from "./route-modal"
 
 export function AppShell({
@@ -36,12 +37,13 @@ export function AppShell({
       name: "sidebar",
       value: next ? "collapsed" : "open",
       path: "/",
-      expires: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      expires: Date.now() + 365 * DAY_MS,
     })
   }
 
   return (
     <LiveChatProvider>
+      <ChatStatusSync chats={chats} />
       <TooltipProvider>
         <ModalHistoryProvider>
           <div className="flex h-dvh bg-bg text-ink">

@@ -13,12 +13,14 @@ import {
 import {
   botIdSchema,
   NEW_KEY,
+  PICK_LISTED_MODEL,
+  PICK_SAVED_PROVIDER,
   TEAMMATE_NOT_FOUND,
   type TeammateFormInput,
   teammateFormSchema,
 } from "@/lib/bot-schemas"
 import type { Provider } from "@/lib/models"
-import { blobs, chatRuntime, modelCatalog, sandboxes } from "@/server/container"
+import { blobs, chatRuntime, sandboxes } from "@/server/container"
 import {
   type BotInput,
   type BotKey,
@@ -33,6 +35,7 @@ import { findBotSandboxRef } from "@/server/db/queries/sandboxes"
 import { env, teammateCaps } from "@/server/env"
 import { readPicture } from "@/server/picture"
 import type { StoredBlob } from "@/server/ports/blob-store"
+import { isListedModel } from "@/server/provider-key-models"
 import { sealProviderKey } from "@/server/seal-provider-key"
 import { requireUser } from "@/server/session"
 
@@ -54,7 +57,7 @@ async function resolveKey(
     }
   }
   const key = await findProviderKey(userId, input.providerKeyId)
-  if (!key) return fail("Pick one of your AI providers.", "providerKeyId")
+  if (!key) return fail(PICK_SAVED_PROVIDER, "providerKeyId")
   return { ok: true, key: { id: key.id }, provider: key.provider }
 }
 
@@ -86,11 +89,8 @@ async function parseForm(
 
   const key = await resolveKey(userId, parsed.data)
   if (!key.ok) return key
-  if (
-    key.provider !== "openai_compatible" &&
-    !(await modelCatalog.find(key.provider, input.modelId))
-  ) {
-    return fail("Pick a model from the list.", "modelId")
+  if (!(await isListedModel(key.provider, input.modelId))) {
+    return fail(PICK_LISTED_MODEL, "modelId")
   }
 
   let picture: StoredBlob | null | undefined

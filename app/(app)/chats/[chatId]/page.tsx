@@ -6,6 +6,7 @@ import { chatIdSchema } from "@/lib/chat-schemas"
 import { teammatePictureUrl } from "@/lib/format"
 import { chatRuntime } from "@/server/container"
 import { findChat } from "@/server/db/queries/chats"
+import { listProviderKeyModels } from "@/server/provider-key-models"
 import { requireUser } from "@/server/session"
 
 const loadChat = cache(async (chatId: string) => {
@@ -28,13 +29,16 @@ export default async function ChatPage({
   params,
 }: PageProps<"/chats/[chatId]">) {
   const chat = await loadChat((await params).chatId)
-  const session =
+  const user = await requireUser()
+  const [session, providerKeys] = await Promise.all([
     chat.messages.length > 0
-      ? {
-          publicAccessToken: await chatRuntime.accessToken(chat.id),
+      ? chatRuntime.accessToken(chat.id).then((publicAccessToken) => ({
+          publicAccessToken,
           lastEventId: chat.cursors?.lastOutEventId,
-        }
-      : undefined
+        }))
+      : undefined,
+    listProviderKeyModels(user.id),
+  ])
 
   return (
     <ChatView
@@ -47,11 +51,13 @@ export default async function ChatPage({
         picture: teammatePictureUrl(bot),
         connected: bot.connected,
         fullAuto: bot.fullAuto,
+        model: bot.model,
       }))}
       lastBotId={chat.lastBotId}
       controlBotId={chat.controlBotId}
       initialMessages={chat.messages}
       session={session}
+      providerKeys={providerKeys}
     />
   )
 }

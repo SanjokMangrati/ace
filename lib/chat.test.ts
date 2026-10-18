@@ -22,13 +22,23 @@ function said(text: string): TeammateMessage {
 
 describe("chatTitle", () => {
   it("uses the first line of the message", () => {
-    expect(chatTitle("  Sort my receipts\nby month please")).toBe(
+    expect(chatTitle("  Sort my receipts\nby month please", team)).toBe(
       "Sort my receipts"
     )
   })
 
+  it("leaves out the teammates the message starts with", () => {
+    expect(chatTitle("@writer, @Researcher: plan the offsite", team)).toBe(
+      "Plan the offsite"
+    )
+    expect(chatTitle("@Writers plan the offsite", team)).toBe(
+      "@Writers plan the offsite"
+    )
+    expect(chatTitle("@Writer", team)).toBe("@Writer")
+  })
+
   it("cuts long messages at a word and adds an ellipsis", () => {
-    const title = chatTitle(`${"word ".repeat(30)}end`)
+    const title = chatTitle(`${"word ".repeat(30)}end`, team)
     expect(title.endsWith("word…")).toBe(true)
     expect(title.length).toBeLessThanOrEqual(81)
   })
@@ -81,14 +91,6 @@ describe("nextTeammate", () => {
       { from: "Researcher", to: "Writer" },
       0
     )
-    expect(nextTeammate(message, team, "r").id).toBe("w")
-  })
-
-  it("routes a hand-back to the teammate whose screen it was", () => {
-    const message = {
-      ...said("I'm done with your screen"),
-      metadata: { control: { tookAt: 0, gaveAt: 1, botId: "w" } },
-    }
     expect(nextTeammate(message, team, "r").id).toBe("w")
   })
 
