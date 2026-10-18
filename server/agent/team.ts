@@ -7,6 +7,10 @@ export type TeamBot = { id: string; name: string; job: string }
 
 const ACTION_LIMIT = 20
 
+export function teamNames(team: TeamBot[]) {
+  return new Map(team.map((bot) => [bot.id, bot.name]))
+}
+
 function action(part: Part) {
   if (!("state" in part) || part.state !== "output-available") return null
   switch (part.type) {
@@ -57,7 +61,7 @@ export function teamView(
   botId: string,
   team: TeamBot[]
 ) {
-  const names = new Map(team.map((bot) => [bot.id, bot.name]))
+  const names = teamNames(team)
   return messages.map((message): TeammateMessage => {
     const author = message.metadata?.botId
     if (message.role === "assistant" && author && author !== botId) {

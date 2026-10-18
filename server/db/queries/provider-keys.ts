@@ -1,6 +1,5 @@
 import "server-only"
 import { and, asc, eq } from "drizzle-orm"
-import type { Provider } from "@/lib/models"
 import { type Db, db } from "@/server/db/client"
 import { bot, providerKey } from "@/server/db/schema"
 
@@ -25,13 +24,10 @@ export async function findProviderKey(userId: string, id: string) {
   return row ?? null
 }
 
-export type NewProviderKey = {
-  provider: Provider
-  baseUrl: string | null
-  judgeModelId: string | null
-  sealedKey: string | null
-  keyHint: string | null
-}
+export type NewProviderKey = Pick<
+  typeof providerKey.$inferSelect,
+  "provider" | "baseUrl" | "judgeModelId" | "sealedKey" | "keyHint"
+>
 
 export async function insertProviderKey(
   values: NewProviderKey & { userId: string },

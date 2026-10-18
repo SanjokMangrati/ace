@@ -1,5 +1,9 @@
 "use client"
 
+import type {
+  ChatSessionPersistedState,
+  TriggerChatTransport,
+} from "@trigger.dev/sdk/chat"
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react"
 import {
   mintChatAccessToken,
@@ -8,10 +12,7 @@ import {
 import { TEAMMATE_CHAT_TASK } from "@/lib/chat"
 import type { teammateChat } from "@/trigger/teammate-chat"
 
-export type ChatSession = {
-  publicAccessToken: string
-  lastEventId?: string
-}
+export type ChatSession = ChatSessionPersistedState
 
 export function useChatTransport(chatId: string, session?: ChatSession) {
   return useTriggerChatTransport<typeof teammateChat>({
@@ -23,7 +24,7 @@ export function useChatTransport(chatId: string, session?: ChatSession) {
 }
 
 export function expectNextTurn(
-  transport: ReturnType<typeof useChatTransport>,
+  transport: TriggerChatTransport,
   chatId: string
 ) {
   const session = transport.getSession(chatId)

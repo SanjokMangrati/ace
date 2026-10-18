@@ -1,5 +1,5 @@
 import { botIdSchema } from "@/lib/bot-schemas"
-import { auth } from "@/server/container"
+import { auth, blobs } from "@/server/container"
 import { findBotPicture } from "@/server/db/queries/bots"
 
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
   const id = botIdSchema.safeParse(botId)
   if (!id.success) return new Response(null, { status: 404 })
 
-  const picture = await findBotPicture(session.user.id, id.data)
+  const picture = await findBotPicture(blobs, session.user.id, id.data)
   if (!picture) return new Response(null, { status: 404 })
 
   return new Response(new Uint8Array(picture.data), {

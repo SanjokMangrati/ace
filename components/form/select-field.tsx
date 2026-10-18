@@ -7,12 +7,7 @@ import {
   type FieldPath,
   type FieldValues,
 } from "react-hook-form"
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldTitle,
-} from "@/components/ui/field"
+import { Field, FieldError, FieldTitle } from "@/components/ui/field"
 import {
   Select,
   SelectContent,
@@ -33,7 +28,6 @@ export function SelectField<TValues extends FieldValues>({
   control,
   name,
   label,
-  description,
   options,
   placeholder,
   disabled,
@@ -42,7 +36,6 @@ export function SelectField<TValues extends FieldValues>({
   control: Control<TValues>
   name: FieldPath<TValues>
   label: React.ReactNode
-  description?: React.ReactNode
   options: SelectFieldOption[]
   placeholder: string
   disabled?: boolean
@@ -98,11 +91,7 @@ export function SelectField<TValues extends FieldValues>({
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {fieldState.invalid ? (
-              <FieldError errors={[fieldState.error]} />
-            ) : (
-              description && <FieldDescription>{description}</FieldDescription>
-            )}
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
         )
       }}

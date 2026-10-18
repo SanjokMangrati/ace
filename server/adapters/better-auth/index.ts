@@ -13,10 +13,8 @@ export function createBetterAuthAdapter(): AuthPort {
     async getSession(headers) {
       const result = await auth.api.getSession({ headers })
       if (!result) return null
-      const { session, user } = result
+      const { user } = result
       return {
-        id: session.id,
-        expiresAt: session.expiresAt,
         user: {
           id: user.id,
           name: user.name,

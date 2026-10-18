@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { anthropicComputerTool, toComputerAction } from "./computer"
 
 const handlers = {
-  execute: async () => ({}),
+  execute: async () => ({ cursor: { x: 0, y: 0 } }),
   toModelOutput: async () => ({ type: "text" as const, value: "" }),
 }
 

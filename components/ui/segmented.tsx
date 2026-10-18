@@ -4,7 +4,10 @@ import { Radio as RadioPrimitive } from "@base-ui/react/radio"
 import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group"
 import { cn } from "@/lib/utils"
 
-function SegmentedGroup({ className, ...props }: RadioGroupPrimitive.Props) {
+function SegmentedGroup<Value>({
+  className,
+  ...props
+}: RadioGroupPrimitive.Props<Value>) {
   return (
     <RadioGroupPrimitive
       data-slot="segmented-group"

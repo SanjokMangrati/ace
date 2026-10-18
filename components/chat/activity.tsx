@@ -22,6 +22,7 @@ import {
   TerminalWindowIcon,
 } from "@phosphor-icons/react/ssr"
 import { useId, useState } from "react"
+import { textLinkClass } from "@/components/ui/text-link"
 import { Tile } from "@/components/ui/tile"
 import { workedFor } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -183,6 +184,7 @@ function sentence(step: Step) {
 }
 
 const stepTiles = {
+  think: { color: "grape", Icon: BrainIcon },
   remember: { color: "sun", Icon: LightbulbIcon },
   forget: { color: "sun", Icon: EraserIcon },
   command: { color: "lime", Icon: TerminalWindowIcon },
@@ -211,22 +213,10 @@ function StepIcon({ step }: { step: Step }) {
   if (step.kind === "control") {
     return <HandPalmIcon weight="duotone" className="mt-px size-5" />
   }
-  if (step.kind === "screen") {
-    const Icon = screenIcons[step.verb]
-    return (
-      <Tile size="xs" color="peach" className="-mt-0.5">
-        <Icon weight="duotone" />
-      </Tile>
-    )
-  }
-  if (step.kind === "think") {
-    return (
-      <Tile size="xs" color="grape" className="-mt-0.5">
-        <BrainIcon weight="duotone" />
-      </Tile>
-    )
-  }
-  const { color, Icon } = stepTiles[step.kind]
+  const { color, Icon } =
+    step.kind === "screen"
+      ? { color: "peach" as const, Icon: screenIcons[step.verb] }
+      : stepTiles[step.kind]
   return (
     <Tile size="xs" color={color} className="-mt-0.5">
       <Icon weight="duotone" />
@@ -291,7 +281,7 @@ export function ShowDetails({
         aria-expanded={open}
         aria-controls={detailsId}
         onClick={() => setOpen((value) => !value)}
-        className="cursor-pointer self-start text-ink-3 underline decoration-line-strong underline-offset-3 hover:decoration-current"
+        className={cn(textLinkClass, "cursor-pointer self-start text-ink-3")}
       >
         {open ? "Hide details" : "Show details"}
       </button>

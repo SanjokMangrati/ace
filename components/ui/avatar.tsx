@@ -30,9 +30,8 @@ const avatarVariants = cva(
     variants: {
       kind: {
         teammate: "rounded-avatar",
-        you: "rounded-full",
+        you: "rounded-full bg-ink text-bg",
       },
-      color: candyBackgrounds,
       size: {
         xs: "size-5.5 text-letter-xs",
         sm: "size-7 text-letter-sm",
@@ -41,10 +40,8 @@ const avatarVariants = cva(
         xl: "size-18 text-letter-xl",
       },
     },
-    compoundVariants: [{ kind: "you", className: "bg-ink text-bg" }],
     defaultVariants: {
       kind: "teammate",
-      color: "lime",
       size: "md",
     },
   }
@@ -53,14 +50,13 @@ const avatarVariants = cva(
 function Avatar({
   className,
   kind,
-  color,
   size,
   ...props
 }: AvatarPrimitive.Root.Props & VariantProps<typeof avatarVariants>) {
   return (
     <AvatarPrimitive.Root
       data-slot="avatar"
-      className={cn(avatarVariants({ kind, color, size }), className)}
+      className={cn(avatarVariants({ kind, size }), className)}
       {...props}
     />
   )
@@ -94,22 +90,13 @@ function TeammateAvatar({
   name,
   picture,
   ...props
-}: Omit<
-  React.ComponentProps<typeof Avatar>,
-  "kind" | "color" | "children"
-> & {
+}: Omit<React.ComponentProps<typeof Avatar>, "kind" | "children"> & {
   botId: string
   name: string
   picture?: string | null
 }) {
   return (
-    <Avatar
-      kind="teammate"
-      color={null}
-      role="img"
-      aria-label={name}
-      {...props}
-    >
+    <Avatar kind="teammate" role="img" aria-label={name} {...props}>
       <AvatarImage
         key={picture ?? botId}
         src={picture ?? `/api/avatars/${encodeURIComponent(botId)}`}
@@ -135,11 +122,4 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-export {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-  AvatarGroup,
-  TeammateAvatar,
-  candyFor,
-}
+export { Avatar, AvatarImage, AvatarFallback, AvatarGroup, TeammateAvatar }

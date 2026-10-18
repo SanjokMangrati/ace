@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "@/server/db/client"
 import type { LeaseHolder } from "@/server/db/queries/sandboxes"
 import * as schema from "@/server/db/schema"
+import { createFakeTurnRuntime } from "@/server/fakes/turn-runtime"
 import { sandboxLease } from "./lease"
 
 vi.mock("@/server/db/client")
@@ -10,25 +11,7 @@ vi.mock("@/server/db/client")
 let botId: string
 let chatIds: string[]
 
-function fakeRuntime() {
-  const waits = new Map<string, () => void>()
-  const pending = new Map<string, Promise<void>>()
-  const timeouts: number[] = []
-  return {
-    timeouts,
-    expire: (ref: string) => waits.get(ref)?.(),
-    refs: () => [...waits.keys()],
-    createWait: async (timeoutSec: number) => {
-      const ref = `wait-${timeouts.push(timeoutSec)}`
-      pending.set(ref, new Promise((resolve) => waits.set(ref, resolve)))
-      return ref
-    },
-    completeWait: async (ref: string) => waits.get(ref)?.(),
-    waitFor: async (ref: string) => pending.get(ref),
-  }
-}
-
-async function startTurn(chatIndex: number, runtime = fakeRuntime()) {
+async function startTurn(chatIndex: number, runtime = createFakeTurnRuntime()) {
   const [row] = await db
     .insert(schema.turn)
     .values({ chatId: chatIds[chatIndex], botId })
@@ -87,7 +70,7 @@ describe("sandboxLease", () => {
   })
 
   it("waits for the running turn and starts when it releases", async () => {
-    const runtime = fakeRuntime()
+    const runtime = createFakeTurnRuntime()
     const first = await startTurn(0, runtime)
     const second = await startTurn(1, runtime)
     await first.lease.ensure()
@@ -111,7 +94,7 @@ describe("sandboxLease", () => {
   })
 
   it("runs queued turns in the order they arrived", async () => {
-    const runtime = fakeRuntime()
+    const runtime = createFakeTurnRuntime()
     const first = await startTurn(0, runtime)
     const second = await startTurn(1, runtime)
     const third = await startTurn(2, runtime)
@@ -136,7 +119,7 @@ describe("sandboxLease", () => {
   })
 
   it("tells waiters when the running turn waits for you", async () => {
-    const runtime = fakeRuntime()
+    const runtime = createFakeTurnRuntime()
     const first = await startTurn(0, runtime)
     const second = await startTurn(1, runtime)
     await first.lease.ensure()
@@ -150,7 +133,9 @@ describe("sandboxLease", () => {
     await first.lease.park(new Date(Date.now() + 60 * 60_000))
     await vi.waitFor(() => expect(second.queued).toHaveLength(2))
     expect(second.queued[1].waitingOn).toBe("control")
-    expect(runtime.timeouts.at(-1)).toBeGreaterThan(60 * 60)
+    expect([...runtime.waits.values()].at(-1)?.timeoutSec).toBeGreaterThan(
+      60 * 60
+    )
 
     await db
       .update(schema.sandbox)
@@ -166,7 +151,7 @@ describe("sandboxLease", () => {
   })
 
   it("takes over a lease whose holder stopped renewing", async () => {
-    const runtime = fakeRuntime()
+    const runtime = createFakeTurnRuntime()
     const first = await startTurn(0, runtime)
     const second = await startTurn(1, runtime)
     await first.lease.ensure()
@@ -177,7 +162,7 @@ describe("sandboxLease", () => {
       .update(schema.sandbox)
       .set({ leaseExpiresAt: new Date(Date.now() - 1000) })
       .where(eq(schema.sandbox.botId, botId))
-    runtime.expire(runtime.refs()[0])
+    runtime.expire([...runtime.waits.keys()][0])
     await waiting
     expect(second.started).toHaveLength(1)
 

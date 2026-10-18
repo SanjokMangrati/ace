@@ -10,7 +10,10 @@ import {
 import { Field, FieldError, FieldTitle } from "@/components/ui/field"
 import { SegmentedGroup, SegmentedItem } from "@/components/ui/segmented"
 
-export function SegmentedField<TValues extends FieldValues>({
+export function SegmentedField<
+  TValues extends FieldValues,
+  TOption extends string,
+>({
   control,
   name,
   label,
@@ -20,8 +23,8 @@ export function SegmentedField<TValues extends FieldValues>({
   control: Control<TValues>
   name: FieldPath<TValues>
   label: React.ReactNode
-  options: { value: string; label: string }[]
-  onValueChange?: (value: string) => void
+  options: { value: TOption; label: string }[]
+  onValueChange?: (value: TOption) => void
 }) {
   const labelId = useId()
 
@@ -32,12 +35,12 @@ export function SegmentedField<TValues extends FieldValues>({
       render={({ field, fieldState }) => (
         <Field data-invalid={fieldState.invalid}>
           <FieldTitle id={labelId}>{label}</FieldTitle>
-          <SegmentedGroup
+          <SegmentedGroup<TOption>
             aria-labelledby={labelId}
             value={field.value}
             onValueChange={(value) => {
               field.onChange(value)
-              onValueChange?.(String(value))
+              onValueChange?.(value)
             }}
           >
             {options.map((option) => (

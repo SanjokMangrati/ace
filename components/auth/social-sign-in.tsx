@@ -5,6 +5,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
+import { withNext } from "@/lib/safe-redirect"
 import type { SocialProvider } from "@/server/ports/auth"
 import { authClient, authErrorMessage } from "./auth-client"
 
@@ -33,7 +34,7 @@ export function SocialSignIn({
     const { error } = await authClient.signIn.social({
       provider,
       callbackURL: new URL(next, origin).toString(),
-      errorCallbackURL: new URL("/sign-in", origin).toString(),
+      errorCallbackURL: new URL(withNext("/sign-in", next), origin).toString(),
     })
     if (error) {
       setError(authErrorMessage(error))

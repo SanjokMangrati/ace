@@ -13,7 +13,7 @@ import { emptyProviderKey } from "@/lib/provider-key-schemas"
 import { modelCatalog } from "@/server/container"
 import { findBot } from "@/server/db/queries/bots"
 import { listProviderKeys } from "@/server/db/queries/provider-keys"
-import { env } from "@/server/env"
+import { env, teammateCaps } from "@/server/env"
 import { requireUser } from "@/server/session"
 
 const loadBot = cache(async (botId: string) => {
@@ -53,6 +53,7 @@ export default async function TeammatePage({
         providerKeys={keys}
         models={models}
         allowCustom={env.ALLOW_CUSTOM_BASE_URL}
+        limits={teammateCaps}
         defaultValues={{
           name: bot.name,
           job: bot.job,

@@ -1,44 +1,63 @@
 import "server-only"
 import { and, desc, eq, notInArray } from "drizzle-orm"
+import { blobKeys } from "@/server/blob-keys"
 import { db } from "@/server/db/client"
 import { chat, screenshot } from "@/server/db/schema"
+import type { BlobStore } from "@/server/ports/blob-store"
 
 const KEPT_PER_CHAT = 60
 
-export async function saveScreenshot(chatId: string, data: Buffer) {
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(screenshot)
-      .values({ chatId, data })
-      .returning({ id: screenshot.id })
-    const newest = tx
-      .select({ id: screenshot.id })
-      .from(screenshot)
-      .where(eq(screenshot.chatId, chatId))
-      .orderBy(desc(screenshot.createdAt))
-      .limit(KEPT_PER_CHAT)
-    await tx
-      .delete(screenshot)
-      .where(
-        and(eq(screenshot.chatId, chatId), notInArray(screenshot.id, newest))
-      )
-    return row.id
+export async function saveScreenshot(
+  blobs: BlobStore,
+  chatId: string,
+  data: Buffer
+) {
+  const [row] = await db
+    .insert(screenshot)
+    .values({ chatId })
+    .returning({ id: screenshot.id })
+  await blobs.put(blobKeys.screenshot(chatId, row.id), {
+    data,
+    type: "image/jpeg",
   })
+  const newest = db
+    .select({ id: screenshot.id })
+    .from(screenshot)
+    .where(eq(screenshot.chatId, chatId))
+    .orderBy(desc(screenshot.createdAt))
+    .limit(KEPT_PER_CHAT)
+  const pruned = await db
+    .delete(screenshot)
+    .where(
+      and(eq(screenshot.chatId, chatId), notInArray(screenshot.id, newest))
+    )
+    .returning({ id: screenshot.id })
+  await blobs.delete(pruned.map(({ id }) => blobKeys.screenshot(chatId, id)))
+  return row.id
 }
 
-export async function loadScreenshot(id: string) {
+async function screenshotData(blobs: BlobStore, chatId: string, id: string) {
+  const stored = await blobs.get(blobKeys.screenshot(chatId, id))
+  return stored?.data ?? null
+}
+
+export async function loadScreenshot(blobs: BlobStore, id: string) {
   const [row] = await db
-    .select({ data: screenshot.data })
+    .select({ chatId: screenshot.chatId })
     .from(screenshot)
     .where(eq(screenshot.id, id))
-  return row?.data ?? null
+  return row ? screenshotData(blobs, row.chatId, id) : null
 }
 
-export async function findScreenshot(userId: string, id: string) {
+export async function findScreenshot(
+  blobs: BlobStore,
+  userId: string,
+  id: string
+) {
   const [row] = await db
-    .select({ data: screenshot.data })
+    .select({ chatId: screenshot.chatId })
     .from(screenshot)
     .innerJoin(chat, eq(chat.id, screenshot.chatId))
     .where(and(eq(screenshot.id, id), eq(chat.userId, userId)))
-  return row?.data ?? null
+  return row ? screenshotData(blobs, row.chatId, id) : null
 }

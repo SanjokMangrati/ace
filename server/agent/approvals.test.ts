@@ -85,7 +85,8 @@ describe("approvalAnswers", () => {
 })
 
 describe("approvalGate", () => {
-  function gate(onAssessed = vi.fn(async () => {})) {
+  function gate() {
+    const onAssessed = vi.fn(async () => {})
     const onResume = vi.fn(async () => {})
     return {
       onAssessed,

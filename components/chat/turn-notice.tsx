@@ -24,15 +24,11 @@ export function UpNextNotice({
       <Alert variant="needs-you">
         <HandPalmIcon weight="duotone" />
         <AlertDescription>
-          {queue.waitingOn === "control" ? (
-            <>
-              {name} is waiting for you to give back control in {chat}.
-            </>
-          ) : (
-            <>
-              {name} is waiting for your answer in {chat}.
-            </>
-          )}
+          {name} is waiting for{" "}
+          {queue.waitingOn === "control"
+            ? "you to give back control"
+            : "your answer"}{" "}
+          in {chat}.
         </AlertDescription>
       </Alert>
     )

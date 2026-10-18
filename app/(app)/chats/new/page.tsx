@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
-import { connection } from "next/server"
 import { Page, PageHeader } from "@/components/app/page"
 import { NewChatForm } from "@/components/chat/new-chat-form"
 import { teammatePictureUrl } from "@/lib/format"
@@ -14,7 +13,6 @@ export const metadata: Metadata = {
 export default async function NewChatPage({
   searchParams,
 }: PageProps<"/chats/new">) {
-  await connection()
   const user = await requireUser()
   const bots = await listBots(user.id)
   if (bots.length === 0) redirect("/")

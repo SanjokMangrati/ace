@@ -10,6 +10,8 @@ import type { ToolGroup } from "@/lib/bot-schemas"
 import type { CatalogModel, Provider } from "@/lib/models"
 import { truncateMiddle } from "@/server/agent/sandbox-tools"
 import type { toolRisk } from "@/server/db/schema"
+import { NATIVE_ACTION_TYPES } from "@/server/ports/computer"
+import type { TracedCall } from "@/server/ports/telemetry"
 
 export type ToolRisk = (typeof toolRisk.enumValues)[number]
 
@@ -22,13 +24,6 @@ const JUDGE_INPUT_CHARS = 4000
 const REASON_MAX_CHARS = 300
 
 const WORKSPACE = /^(~|\$HOME|\/home\/|\/tmp\/|[^/~$])/
-const NATIVE_CLICKS = new Set([
-  "left_click",
-  "right_click",
-  "middle_click",
-  "double_click",
-  "triple_click",
-])
 const SCREEN_CHANGES = new Set(["click", "drag", "type", "key"])
 const JUDGED_SCREEN = new Set(["click", "type"])
 const SUBMITS = /(^|[\s+])(enter|return)($|[\s+])/i
@@ -110,19 +105,21 @@ function deletesOutside(command: string) {
   return false
 }
 
+function fields(input: unknown): Record<string, unknown> {
+  return typeof input === "object" && input !== null
+    ? (input as Record<string, unknown>)
+    : {}
+}
+
 function field(input: unknown, key: string) {
-  if (typeof input !== "object" || input === null) return undefined
-  const value = (input as Record<string, unknown>)[key]
+  const value = fields(input)[key]
   return typeof value === "string" ? value : undefined
 }
 
 type ScreenAction = { type: string; text: string | undefined }
 
 function screenActions(input: unknown): ScreenAction[] {
-  const call =
-    typeof input === "object" && input !== null
-      ? (input as Record<string, unknown>)
-      : {}
+  const call = fields(input)
   const action = call.action
   if (typeof action === "object" && action !== null) {
     const andThen = Array.isArray(call.andThen) ? call.andThen : []
@@ -134,11 +131,7 @@ function screenActions(input: unknown): ScreenAction[] {
   const name = String(action)
   return [
     {
-      type: NATIVE_CLICKS.has(name)
-        ? "click"
-        : name === "left_click_drag"
-          ? "drag"
-          : name,
+      type: NATIVE_ACTION_TYPES[name] ?? name,
       text: field(input, "text"),
     },
   ]
@@ -263,11 +256,13 @@ export async function judgeRisk({
   call,
   messages,
   abortSignal,
+  traced,
 }: {
   model: LanguageModel
   call: ToolCallInfo
   messages: readonly ModelMessage[]
   abortSignal?: AbortSignal
+  traced: TracedCall
 }): Promise<Verdict & { usage: LanguageModelUsage }> {
   const details = truncateMiddle(
     JSON.stringify(call.input) ?? "",
@@ -275,14 +270,13 @@ export async function judgeRisk({
   )
   const screenshot =
     call.toolName === "computer" ? latestScreenshot(messages) : undefined
-  const timeout = AbortSignal.timeout(JUDGE_TIMEOUT_MS)
   const { output, usage } = await generateText({
+    ...traced,
     model,
     system: JUDGE_SYSTEM,
     output: Output.object({ schema: verdictSchema }),
-    abortSignal: abortSignal
-      ? AbortSignal.any([abortSignal, timeout])
-      : timeout,
+    abortSignal,
+    timeout: JUDGE_TIMEOUT_MS,
     messages: [
       {
         role: "user",

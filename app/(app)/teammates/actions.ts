@@ -18,11 +18,11 @@ import {
   teammateFormSchema,
 } from "@/lib/bot-schemas"
 import type { Provider } from "@/lib/models"
-import { chatRuntime, modelCatalog, sandboxes } from "@/server/container"
+import { blobs, chatRuntime, modelCatalog, sandboxes } from "@/server/container"
 import {
   type BotInput,
   type BotKey,
-  type BotPicture,
+  countBots,
   deleteBot,
   insertBot,
   updateBot,
@@ -30,7 +30,9 @@ import {
 import { listBotChatIds } from "@/server/db/queries/chats"
 import { findProviderKey } from "@/server/db/queries/provider-keys"
 import { findBotSandboxRef } from "@/server/db/queries/sandboxes"
+import { env, teammateCaps } from "@/server/env"
 import { readPicture } from "@/server/picture"
+import type { StoredBlob } from "@/server/ports/blob-store"
 import { sealProviderKey } from "@/server/seal-provider-key"
 import { requireUser } from "@/server/session"
 
@@ -64,7 +66,7 @@ async function parseForm(
       ok: true
       input: BotInput
       key: BotKey
-      picture: BotPicture | null | undefined
+      picture: StoredBlob | null | undefined
     }
   | TeammateFailure
 > {
@@ -74,7 +76,7 @@ async function parseForm(
   } catch {
     return fail(RELOAD_AND_TRY_AGAIN)
   }
-  const parsed = teammateFormSchema.safeParse(raw)
+  const parsed = teammateFormSchema(teammateCaps).safeParse(raw)
   if (!parsed.success) return zodFailure(parsed.error)
   const {
     providerKeyId: _providerKeyId,
@@ -91,7 +93,7 @@ async function parseForm(
     return fail("Pick a model from the list.", "modelId")
   }
 
-  let picture: BotPicture | null | undefined
+  let picture: StoredBlob | null | undefined
   const file = formData.get("picture")
   if (file instanceof File && file.size > 0) {
     const result = readPicture(Buffer.from(await file.arrayBuffer()))
@@ -110,10 +112,23 @@ export async function createTeammate(
   const user = await requireUser()
   const id = botIdSchema.safeParse(formData.get("id"))
   if (!id.success) return fail(RELOAD_AND_TRY_AGAIN)
+  const most = env.MAX_TEAMMATES
+  if (most !== undefined && (await countBots(user.id)) >= most) {
+    return fail(
+      `You already have ${most === 1 ? "a teammate" : `${most} teammates`}, the most you can have here. Delete one to make room for a new one.`
+    )
+  }
   const form = await parseForm(user.id, formData)
   if (!form.ok) return form
 
-  await insertBot(user.id, id.data, form.input, form.key, form.picture ?? null)
+  await insertBot(
+    blobs,
+    user.id,
+    id.data,
+    form.input,
+    form.key,
+    form.picture ?? null
+  )
 
   revalidatePath("/", "layout")
   return { ok: true }
@@ -129,6 +144,7 @@ export async function updateTeammate(
   if (!form.ok) return form
 
   const updated = await updateBot(
+    blobs,
     user.id,
     id.data,
     form.input,
@@ -153,7 +169,8 @@ export async function deleteTeammate(botId: string): Promise<Failure> {
   )
   const sandboxRef = await findBotSandboxRef(user.id, id.data)
   if (sandboxRef) await sandboxes.destroy(sandboxRef)
-  if (!(await deleteBot(user.id, id.data))) return fail(TEAMMATE_NOT_FOUND)
+  if (!(await deleteBot(blobs, user.id, id.data)))
+    return fail(TEAMMATE_NOT_FOUND)
 
   revalidatePath("/", "layout")
   redirect("/teammates")

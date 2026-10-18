@@ -16,7 +16,7 @@ import {
   type NewChatInput,
   newChatSchema,
 } from "@/lib/chat-schemas"
-import { chatRuntime, sandboxes } from "@/server/container"
+import { blobs, chatRuntime, sandboxes } from "@/server/container"
 import {
   deleteChat as deleteChatRow,
   findChatBotIds,
@@ -59,7 +59,7 @@ async function requireChat(chatId: string) {
 async function requireChatBot(chatId: string, botId: string) {
   const chat = await requireChat(chatId)
   if (!chat.botIds.includes(botId)) throw new Error("Chat not found")
-  return { ...chat, botId }
+  return chat
 }
 
 export async function startChatSession(chatId: string) {
@@ -130,7 +130,7 @@ export async function deleteChat(
     )
   )
   await chatRuntime.closeSession(id, "chat deleted")
-  await deleteChatRow(userId, id)
+  await deleteChatRow(blobs, userId, id)
   await Promise.all(botIds.map((botId) => wakeBotWaiters(chatRuntime, botId)))
   revalidatePath("/", "layout")
   if (leave) redirect("/")

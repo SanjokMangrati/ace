@@ -10,6 +10,6 @@ export default defineConfig({
   schema: "./server/db/schema",
   dialect: "postgresql",
   dbCredentials: { url },
-  strict: true,
+  strict: Boolean(process.stdout.isTTY),
   verbose: true,
 })

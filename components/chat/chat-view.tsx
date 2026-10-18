@@ -174,7 +174,8 @@ export function ChatView({
       router.refresh()
     },
   })
-  const [screenOpen, setScreenOpen] = useState(controlBotId !== null)
+  const inControl = controlBotId !== null
+  const [screenOpen, setScreenOpen] = useState(inControl)
   const [fullSize, setFullSize] = useState(false)
   const [shownCall, setShownCall] = useState<string>()
   const wide = useWide()
@@ -203,7 +204,6 @@ export function ChatView({
     mentionedTeammate(draft, teammates) ??
     nextTeammate(undefined, teammates, lastActiveId)
   const onScreen = byId(controlBotId) ?? current
-  const inControl = controlBotId !== null
   const queued =
     working &&
     last?.role === "assistant" &&

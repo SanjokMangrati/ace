@@ -3,6 +3,7 @@
 import { ArrowRightIcon } from "@phosphor-icons/react/ssr"
 import { useState } from "react"
 import { TeammateAvatar } from "@/components/ui/avatar"
+import { textLinkClass } from "@/components/ui/text-link"
 import type { HandoffEvent } from "@/lib/chat"
 import { cn } from "@/lib/utils"
 import type { ChatTeammate } from "./chat-message"
@@ -56,7 +57,10 @@ export function HandoffCard({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="cursor-pointer self-start text-body text-ink-2 underline decoration-line-strong underline-offset-3 hover:decoration-current"
+          className={cn(
+            textLinkClass,
+            "cursor-pointer self-start text-body text-ink-2"
+          )}
         >
           Show more
         </button>

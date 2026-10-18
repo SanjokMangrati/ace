@@ -8,7 +8,6 @@ export type Price = Pick<CatalogModel, "inputUsdPerMTok" | "outputUsdPerMTok">
 
 export type SandboxUse = { since: number; usdPerHour: number }
 
-export const DAY_MS = 24 * 60 * 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
 
 export function totalUsage(steps: readonly { usage: Usage }[]) {

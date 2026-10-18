@@ -8,13 +8,12 @@ export function Page({
   width = "max-w-190",
   title,
   header,
-  className,
   children,
-  ...props
-}: React.ComponentProps<"div"> & {
+}: {
   width?: string
   title?: React.ReactNode
   header?: React.ReactNode
+  children: React.ReactNode
 }) {
   const barRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
@@ -62,10 +61,8 @@ export function Page({
         className={cn(
           "mx-auto flex w-full flex-col gap-6 px-4 pb-16 sm:px-6",
           title ? "pt-2" : "pt-8",
-          width,
-          className
+          width
         )}
-        {...props}
       >
         {header && <div ref={headerRef}>{header}</div>}
         {children}
