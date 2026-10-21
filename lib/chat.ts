@@ -14,6 +14,19 @@ export const TEAMMATE_CHAT_TASK = "teammate-chat"
 
 const TITLE_MAX_LENGTH = 80
 
+export type SidebarChat = {
+  id: string
+  title: string
+  updatedAt: Date
+  working: boolean
+  queued: boolean
+  needsYou: boolean
+  inControl: boolean
+  teammates: { id: string; name: string; picture: string | null }[]
+}
+
+export type SidebarChatPage = { chats: SidebarChat[]; hasMore: boolean }
+
 export type ControlEvent = { tookAt: number; gaveAt?: number; botId?: string }
 
 export type QueueEvent = {

@@ -20,7 +20,7 @@ const buttonStyles = cva(
       },
       size: {
         default: "h-control px-4",
-        sm: "h-control-sm gap-1.5 px-3 text-small [&_svg:not([class*='size-'])]:size-4",
+        sm: "h-control-sm gap-1.5 px-3 text-small font-medium [&_svg:not([class*='size-'])]:size-4",
         icon: "size-control",
         "icon-sm":
           "size-control-sm [&_svg:not([class*='size-'])]:size-4",

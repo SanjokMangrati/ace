@@ -38,7 +38,7 @@ describe("TeammateReply while up next", () => {
       />
     )
     expect(screen.getByRole("alert").textContent).toBe(
-      "Researcher is finishing Q3 vendor spend report first. It'll start on this right after."
+      "Researcher is finishing Q3 vendor spend report first, then starts on this."
     )
   })
 

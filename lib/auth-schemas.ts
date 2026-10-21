@@ -17,18 +17,15 @@ export const signUpSchema = z.object({
     .min(1, "Enter your name.")
     .max(
       NAME_MAX_LENGTH,
-      `Name must be ${NAME_MAX_LENGTH} characters or fewer.`
+      `Keep your name to ${NAME_MAX_LENGTH} characters or fewer.`
     ),
   email: emailSchema,
   password: z
     .string()
-    .min(
-      PASSWORD_MIN_LENGTH,
-      `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`
-    )
+    .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters.`)
     .max(
       PASSWORD_MAX_LENGTH,
-      `Password must be ${PASSWORD_MAX_LENGTH} characters or fewer.`
+      `Keep your password to ${PASSWORD_MAX_LENGTH} characters or fewer.`
     ),
 })
 

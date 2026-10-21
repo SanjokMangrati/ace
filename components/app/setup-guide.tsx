@@ -15,7 +15,7 @@ function Step({
   number: number
   done?: boolean
   title: string
-  description: string
+  description?: string
   action?: React.ReactNode
 }) {
   return (
@@ -34,7 +34,9 @@ function Step({
       </span>
       <span className="min-w-0 flex-1">
         <b className="block font-display text-name">{title}</b>
-        <span className="text-small text-ink-3">{description}</span>
+        {description && (
+          <span className="text-small text-ink-3">{description}</span>
+        )}
       </span>
       {!done && action}
     </div>
@@ -112,11 +114,11 @@ function SetupGuide({
       <Step
         number={1}
         done={connected}
-        title="Connect your AI account"
+        title="Connect an AI provider"
         description={
           connected
             ? `${connectedProvider} · Connected`
-            : "Teammates think using your own AI provider key."
+            : "Teammates run on your own key."
         }
         action={
           <Link
@@ -131,7 +133,6 @@ function SetupGuide({
         number={2}
         done={hasTeammate}
         title="Create a teammate"
-        description="Give it a name and a job."
         action={
           <Link
             href="/teammates/new"
@@ -146,7 +147,7 @@ function SetupGuide({
       />
       <Step
         number={3}
-        title="Give it something to do"
+        title="Give it a task"
         description="Start a chat and ask in plain words."
       />
     </div>

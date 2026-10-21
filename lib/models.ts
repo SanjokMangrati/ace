@@ -31,3 +31,20 @@ export function providerLabel(provider: Provider) {
 export function defaultModelId(models: readonly CatalogModel[]) {
   return models[0]?.id ?? ""
 }
+
+const JUDGE_FAMILY: Partial<Record<Provider, RegExp>> = {
+  anthropic: /haiku/,
+  openai: /mini/,
+  google: /flash(?!-lite)/,
+}
+
+export function judgeModelFor(
+  provider: Provider,
+  models: readonly CatalogModel[],
+  fallback: string
+) {
+  const family = JUDGE_FAMILY[provider]
+  const pick =
+    family && models.find((model) => model.vision && family.test(model.id))
+  return pick?.id ?? fallback
+}

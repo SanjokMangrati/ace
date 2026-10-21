@@ -13,8 +13,7 @@ export function TeammateMemory({
       <List>
         <ListRow>
           <p className="text-small text-ink-3">
-            Nothing yet. When {name} learns something useful, like how you like
-            your reports, it'll show up here.
+            Nothing yet. When {name} learns something useful, it shows up here.
           </p>
         </ListRow>
       </List>

@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { providerKeyOption } from "@/lib/provider-display"
+import { modelCatalog } from "@/server/container"
 import { listProviderKeys } from "@/server/db/queries/provider-keys"
 import { env } from "@/server/env"
 import { requireUser } from "@/server/session"
@@ -22,19 +23,22 @@ export const metadata: Metadata = {
 
 export default async function ProvidersModal() {
   const user = await requireUser()
-  const keys = await listProviderKeys(user.id)
+  const [keys, models] = await Promise.all([
+    listProviderKeys(user.id),
+    modelCatalog.listAll(),
+  ])
   const rows = keys.map((key) => ({
     ...providerKeyOption(key),
     usedBy: key.usedBy,
   }))
 
   return (
-    <RouteModal fallback="/teammates" className="sm:max-w-150">
+    <RouteModal fallback="/teammates" className="sm:max-w-130">
       <DialogHeader>
         <DialogTitle>AI providers</DialogTitle>
         <DialogDescription>
-          Your teammates think using your own AI account. Add a key here, then
-          pick it in each teammate's settings.
+          Teammates run on your own AI account. Add a key, then pick it in each
+          teammate's settings.
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-5">
@@ -43,7 +47,7 @@ export default async function ProvidersModal() {
           <Alert role="note">
             <LockIcon weight="duotone" />
             <AlertDescription>
-              Keys are stored encrypted and used only while your teammates work.
+              Ace encrypts your keys and uses them only while teammates work.
               They never go onto a teammate's computer.
             </AlertDescription>
           </Alert>
@@ -51,6 +55,7 @@ export default async function ProvidersModal() {
         <Section id="s-add" title="Add a key">
           <AddProviderKeyForm
             allowCustom={env.ALLOW_CUSTOM_BASE_URL}
+            models={models}
             labelledBy="s-add"
           />
         </Section>

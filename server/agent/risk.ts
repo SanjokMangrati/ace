@@ -7,7 +7,6 @@ import {
 } from "ai"
 import { z } from "zod"
 import type { ToolGroup } from "@/lib/bot-schemas"
-import type { CatalogModel, Provider } from "@/lib/models"
 import { truncateMiddle } from "@/server/agent/sandbox-tools"
 import type { toolRisk } from "@/server/db/schema"
 import { NATIVE_ACTION_TYPES } from "@/server/ports/computer"
@@ -27,11 +26,6 @@ const WORKSPACE = /^(~|\$HOME|\/home\/|\/tmp\/|[^/~$])/
 const SCREEN_CHANGES = new Set(["click", "drag", "type", "key"])
 const JUDGED_SCREEN = new Set(["click", "type"])
 const SUBMITS = /(^|[\s+])(enter|return)($|[\s+])/i
-const JUDGE_FAMILY: Partial<Record<Provider, RegExp>> = {
-  anthropic: /haiku/,
-  openai: /mini/,
-  google: /flash(?!-lite)/,
-}
 
 const SECRET_PATH =
   /(^|[\s/"'=:])(\.ssh(\/|\s|$)|\.env(\.\w+)?(\s|$|["'])|\.aws\/credentials|\.config\/gcloud|\.azure\/|\.kube\/config|\.docker\/config\.json|\.netrc|\.npmrc|\.pypirc|\.git-credentials|\.gnupg|\.password-store|id_(rsa|ed25519|ecdsa|dsa)\b|\S+\.pem\b|\/etc\/shadow|Login Data|Cookies(\s|$))/
@@ -203,17 +197,6 @@ export function isJudged({ toolName, input }: ToolCallInfo) {
     )
   }
   return false
-}
-
-export function judgeModelFor(
-  provider: Provider,
-  models: readonly CatalogModel[],
-  fallback: string
-) {
-  const family = JUDGE_FAMILY[provider]
-  const pick =
-    family && models.find((model) => model.vision && family.test(model.id))
-  return pick?.id ?? fallback
 }
 
 function latestScreenshot(messages: readonly ModelMessage[]) {

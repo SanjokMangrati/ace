@@ -115,7 +115,7 @@ export async function createTeammate(
   const most = env.MAX_TEAMMATES
   if (most !== undefined && (await countBots(user.id)) >= most) {
     return fail(
-      `You already have ${most === 1 ? "a teammate" : `${most} teammates`}, the most you can have here. Delete one to make room for a new one.`
+      `You already have ${most === 1 ? "a teammate" : `${most} teammates`}, the most allowed here. Delete one to add another.`
     )
   }
   const form = await parseForm(user.id, formData)

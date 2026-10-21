@@ -39,10 +39,7 @@ export function DeleteTeammate({
   return (
     <List>
       <ListRow className="flex-wrap">
-        <ListRowText
-          title={`Delete ${name}`}
-          description="Its computer, its files and what it remembers are deleted for good."
-        />
+        <ListRowText title={`Delete ${name}`} />
         <AlertDialog>
           <AlertDialogTrigger
             render={<Button type="button" variant="danger-quiet" size="sm" />}
@@ -61,8 +58,8 @@ export function DeleteTeammate({
               />
               <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
               <AlertDialogDescription>
-                {name}'s computer, the files on it and what it remembers will be
-                deleted for good. This can't be undone.
+                {name}'s computer, its files and what it remembers are deleted
+                for good.
               </AlertDialogDescription>
               {error && <FieldError>{error}</FieldError>}
             </AlertDialogHeader>

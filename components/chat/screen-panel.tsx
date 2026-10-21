@@ -109,7 +109,7 @@ function LiveScreen({
   if (screen === "failed") {
     return (
       <ErrorNotice
-        message={`${name}'s screen didn't open. Try again in a moment.`}
+        message={`${name}'s screen didn't open.`}
         className="rounded-none"
       >
         <Button variant="secondary" size="sm" onClick={onRetry}>
@@ -262,7 +262,7 @@ export function ScreenPanel({
           />
           <p className="px-4 py-2.5 text-caption text-ink-3">
             {inControl
-              ? `Your clicks and typing go to ${name}'s screen. ${name} stays paused until you give back control.`
+              ? `Your clicks and typing go to ${name}'s screen.`
               : working
                 ? `Watching only. ${name} is using the screen.`
                 : "Watching only."}

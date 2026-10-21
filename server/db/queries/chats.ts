@@ -11,14 +11,16 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   not,
+  or,
   type SQL,
   sql,
   sum,
 } from "drizzle-orm"
 import { askBeforeFrom } from "@/lib/bot-schemas"
 import { chatTitle, type TeammateMessage } from "@/lib/chat"
-import type { PickedModel } from "@/lib/chat-schemas"
+import type { ChatCursor, PickedModel } from "@/lib/chat-schemas"
 import type { ApprovalAnswer } from "@/server/agent/approvals"
 import { blobKeys } from "@/server/blob-keys"
 import { db, type Tx } from "@/server/db/client"
@@ -121,7 +123,16 @@ async function listMembers(chatIds: string[]) {
       .map(({ chatId: _chatId, ...member }) => member)
 }
 
-export async function listChats(userId: string) {
+export const CHAT_PAGE_SIZE = 30
+
+const chatUpdatedMs = sql`date_trunc('milliseconds', ${chat.updatedAt})`
+
+function olderThan({ updatedAt, id }: ChatCursor) {
+  const at = sql`${updatedAt.toISOString()}::timestamp`
+  return or(lt(chatUpdatedMs, at), and(eq(chatUpdatedMs, at), lt(chat.id, id)))
+}
+
+export async function listChats(userId: string, after?: ChatCursor) {
   const rows = await db
     .select({
       id: chat.id,
@@ -132,10 +143,15 @@ export async function listChats(userId: string) {
       inControl: sql<boolean>`${inControl}`,
     })
     .from(chat)
-    .where(eq(chat.userId, userId))
-    .orderBy(desc(chat.updatedAt))
-  const membersOf = await listMembers(rows.map((row) => row.id))
-  return rows.map((row) => ({ ...row, bots: membersOf(row.id) }))
+    .where(and(eq(chat.userId, userId), after && olderThan(after)))
+    .orderBy(desc(chatUpdatedMs), desc(chat.id))
+    .limit(CHAT_PAGE_SIZE + 1)
+  const page = rows.slice(0, CHAT_PAGE_SIZE)
+  const membersOf = await listMembers(page.map((row) => row.id))
+  return {
+    chats: page.map((row) => ({ ...row, bots: membersOf(row.id) })),
+    hasMore: rows.length > CHAT_PAGE_SIZE,
+  }
 }
 
 export function listChatStatuses(userId: string, ids: string[]) {

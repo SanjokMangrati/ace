@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 const tools: {
   tool: ToolGroup
   title: string
-  example: string
+  example?: string
   color: TileColor
   Icon: typeof TerminalWindowIcon
 }[] = [
@@ -35,28 +35,24 @@ const tools: {
   {
     tool: "files_write",
     title: "Creates or changes files",
-    example: "Like saving a report",
     color: "sky",
     Icon: FloppyDiskIcon,
   },
   {
     tool: "computer",
     title: "Clicks and types on its screen",
-    example: "Like filling in a form on a website",
     color: "peach",
     Icon: CursorClickIcon,
   },
   {
     tool: "files_read",
     title: "Opens and reads files",
-    example: "Like a spreadsheet you gave it",
     color: "grape",
     Icon: FileTextIcon,
   },
   {
     tool: "notes",
     title: "Saves something to remember",
-    example: "Like how you like your reports",
     color: "sun",
     Icon: LightbulbIcon,
   },
@@ -133,15 +129,15 @@ export function AskBefore({
       </List>
       {fullAuto && (
         <p className="text-small text-ink-3">
-          These are skipped while {nameInSentence} works without asking.
+          {name} won't ask about these while it works without asking.
         </p>
       )}
       <Alert role="note">
         <InfoIcon weight="duotone" />
         <AlertDescription>
-          <b>Some things always need you.</b> {name} always asks before paying
-          for something, sharing your private files or passwords, or deleting
-          things outside its own folders, even when it works without asking.
+          <b>Some things always need you.</b> Even when it works without asking,{" "}
+          {nameInSentence} asks before it pays for something, shares your
+          private files or passwords, or deletes things outside its own folders.
         </AlertDescription>
       </Alert>
     </>

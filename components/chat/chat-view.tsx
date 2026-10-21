@@ -418,7 +418,7 @@ export function ChatView({
                   ) : needsYou ? (
                     `${current.name} is waiting for your answer above`
                   ) : working ? (
-                    `${current.name} is working on this. You can reply when it's done.`
+                    `You can reply when ${current.name} is done.`
                   ) : (
                     group && (
                       <>

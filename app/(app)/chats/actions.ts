@@ -16,7 +16,9 @@ import {
 } from "@/lib/bot-schemas"
 import type { ControlEvent } from "@/lib/chat"
 import {
+  type ChatCursor,
   type ChatModelInput,
+  chatCursorSchema,
   chatIdSchema,
   chatModelSchema,
   type NewChatInput,
@@ -40,6 +42,7 @@ import {
 import { isListedModel } from "@/server/provider-key-models"
 import { TAKEOVER_TIMEOUT_SEC, wakeBotWaiters } from "@/server/sandbox/lease"
 import { requireUser } from "@/server/session"
+import { listSidebarChats } from "@/server/sidebar-chats"
 
 const LIVE_VIEW_TTL_SEC = 30 * 60
 
@@ -104,6 +107,12 @@ export async function changeChatModel(
   await setChatModel(id, botId, model)
   refresh()
   return { ok: true }
+}
+
+export async function loadMoreChats(after: ChatCursor) {
+  const user = await requireUser()
+  const page = await listSidebarChats(user.id, chatCursorSchema.parse(after))
+  return { ok: true as const, ...page }
 }
 
 export async function chatStatuses(chatIds: string[]) {

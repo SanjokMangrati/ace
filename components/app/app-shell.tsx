@@ -11,9 +11,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import type { SidebarChatPage } from "@/lib/chat"
 import { DAY_MS } from "@/lib/format"
 import type { AuthUser } from "@/server/ports/auth"
-import { AppSidebar, type SidebarChat } from "./app-sidebar"
+import { AppSidebar } from "./app-sidebar"
+import { useChatPages } from "./chat-pages"
 import { ChatStatusSync, LiveChatProvider } from "./live-chat"
 import { ModalHistoryProvider } from "./route-modal"
 
@@ -24,12 +26,13 @@ export function AppShell({
   children,
 }: {
   user: AuthUser
-  chats: SidebarChat[]
+  chats: SidebarChatPage
   sidebarCollapsed: boolean
   children: React.ReactNode
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(sidebarCollapsed)
+  const pages = useChatPages(chats)
 
   function collapseSidebar(next: boolean) {
     setCollapsed(next)
@@ -43,14 +46,14 @@ export function AppShell({
 
   return (
     <LiveChatProvider>
-      <ChatStatusSync chats={chats} />
+      <ChatStatusSync chats={pages.chats} />
       <TooltipProvider>
         <ModalHistoryProvider>
           <div className="flex h-dvh bg-bg text-ink">
             <div className="hidden h-full shrink-0 sidebar:flex">
               <AppSidebar
                 user={user}
-                chats={chats}
+                pages={pages}
                 collapsed={collapsed}
                 onCollapse={() => collapseSidebar(true)}
                 onExpand={() => collapseSidebar(false)}
@@ -70,7 +73,7 @@ export function AppShell({
                     <SheetTitle className="sr-only">Menu</SheetTitle>
                     <AppSidebar
                       user={user}
-                      chats={chats}
+                      pages={pages}
                       onNavigate={() => setMenuOpen(false)}
                     />
                   </SheetContent>

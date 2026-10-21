@@ -11,7 +11,12 @@ import {
 } from "@/lib/chat"
 import { chatActionSchema } from "@/lib/chat-schemas"
 import { DAY_MS } from "@/lib/format"
-import { type CatalogModel, type Provider, providerLabel } from "@/lib/models"
+import {
+  type CatalogModel,
+  judgeModelFor,
+  type Provider,
+  providerLabel,
+} from "@/lib/models"
 import { createAiGatewayCatalog } from "@/server/adapters/ai-gateway"
 import { createAiSdkModels } from "@/server/adapters/ai-sdk"
 import { createDaytonaSandboxes } from "@/server/adapters/daytona"
@@ -48,7 +53,7 @@ import {
 } from "@/server/agent/limits"
 import { noteTools } from "@/server/agent/notes"
 import { systemPrompt } from "@/server/agent/prompt"
-import { judgeModelFor, judgeRisk, type ToolRisk } from "@/server/agent/risk"
+import { judgeRisk, type ToolRisk } from "@/server/agent/risk"
 import { sandboxTools } from "@/server/agent/sandbox-tools"
 import {
   type TeamBot,

@@ -48,10 +48,7 @@ export function SignInForm({
       aria-labelledby={AUTH_TITLE_ID}
       className="flex flex-col gap-5"
     >
-      <AuthHeader
-        title="Welcome back"
-        description="Sign in to see what your teammates are up to."
-      />
+      <AuthHeader title="Welcome back" />
       <FormError control={form.control} initialMessage={initialError} />
       <TextField
         control={form.control}
@@ -59,7 +56,6 @@ export function SignInForm({
         label="Email"
         type="email"
         autoComplete="email"
-        placeholder="you@example.com"
       />
       <PasswordField
         control={form.control}

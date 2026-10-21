@@ -26,7 +26,7 @@ export function PresetPicker({
   onPick: (preset: TeammatePreset) => void
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {TEAMMATE_PRESETS.map((preset) => {
         const { color, Icon } = looks[preset.id]
         return (
@@ -34,8 +34,9 @@ export function PresetPicker({
             key={preset.id}
             pressed={selected === preset.id}
             onClick={() => onPick(preset)}
+            className="gap-2.5 px-3 py-2"
             media={
-              <Tile color={color}>
+              <Tile color={color} size="xs">
                 <Icon weight="duotone" />
               </Tile>
             }

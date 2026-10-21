@@ -91,7 +91,7 @@ export function modelIdSchema(schema: z.ZodString) {
 
 function budget(label: string, maxUsd: number) {
   return z
-    .number({ error: `Enter an amount for ${label}, like 1.00.` })
+    .number({ error: "Enter an amount, like 1.00." })
     .min(0.01, `Spend at least $0.01 ${label}.`)
     .max(maxUsd, `Keep it at $${maxUsd} or less ${label}.`)
 }

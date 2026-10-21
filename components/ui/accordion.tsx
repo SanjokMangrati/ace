@@ -1,5 +1,5 @@
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion"
-import { CaretDownIcon } from "@phosphor-icons/react/ssr"
+import { CaretUpIcon } from "@phosphor-icons/react/ssr"
 import { cn } from "@/lib/utils"
 
 function Accordion({ className, ...props }: AccordionPrimitive.Root.Props) {
@@ -39,7 +39,7 @@ function AccordionTrigger({
         {...props}
       >
         {children}
-        <CaretDownIcon
+        <CaretUpIcon
           weight="duotone"
           data-slot="accordion-trigger-icon"
           className="pointer-events-none size-5 shrink-0 text-ink-2 transition-transform duration-150 ease-out group-aria-expanded/accordion-trigger:rotate-180"

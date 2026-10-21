@@ -11,10 +11,7 @@ export async function sealProviderKey(
 ): Promise<{ ok: true; key: NewProviderKey } | Failure<"provider" | "apiKey">> {
   const custom = input.provider === "openai_compatible"
   if (custom && !env.ALLOW_CUSTOM_BASE_URL) {
-    return fail(
-      "This server only allows Anthropic, OpenAI and Google.",
-      "provider"
-    )
+    return fail("Pick Anthropic, OpenAI or Google.", "provider")
   }
   const baseUrl = custom ? input.baseUrl || null : null
   if (
@@ -26,7 +23,7 @@ export async function sealProviderKey(
   ) {
     const label = providerLabel(input.provider)
     return fail(
-      `${label} didn't accept this key. Copy it again from your ${label} account and paste it once.`,
+      `${label} didn't accept this key. Copy it again from your ${label} account.`,
       "apiKey"
     )
   }

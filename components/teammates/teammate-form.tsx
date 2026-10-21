@@ -6,9 +6,11 @@ import { useEffect, useMemo, useState } from "react"
 import { flushSync } from "react-dom"
 import { type FieldErrors, useForm, useWatch } from "react-hook-form"
 import { createTeammate, updateTeammate } from "@/app/(app)/teammates/actions"
+import { modelChoice } from "@/components/app/model-menu"
 import { Section } from "@/components/app/page"
 import { useCloseModal } from "@/components/app/route-modal"
 import { FormError } from "@/components/form/form-error"
+import { ModelField } from "@/components/form/model-field"
 import { NumberSentenceField } from "@/components/form/number-sentence-field"
 import {
   SelectField,
@@ -18,6 +20,7 @@ import { SubmitButton } from "@/components/form/submit-button"
 import { TextField } from "@/components/form/text-field"
 import { TextareaField } from "@/components/form/textarea-field"
 import { ProviderKeyFields } from "@/components/providers/provider-key-fields"
+import { useServerModels } from "@/components/providers/use-server-models"
 import {
   Accordion,
   AccordionContent,
@@ -44,11 +47,12 @@ import {
   teammateFormSchema,
 } from "@/lib/bot-schemas"
 import {
+  type CatalogModel,
   defaultModelId,
   type Provider,
   type ProviderModels,
 } from "@/lib/models"
-import type { ProviderKeyOption } from "@/lib/provider-display"
+import type { ProviderKeyModels } from "@/lib/provider-display"
 import { findPreset, type TeammatePreset } from "@/lib/teammate-presets"
 import { cn } from "@/lib/utils"
 import { AskBefore } from "./ask-before"
@@ -90,7 +94,7 @@ export function TeammateForm({
   savedName: string
   savedPicture: string | null
   defaultValues: TeammateFormInput
-  providerKeys: ProviderKeyOption[]
+  providerKeys: ProviderKeyModels[]
   models: ProviderModels
   allowCustom: boolean
   limits: TeammateLimits
@@ -110,6 +114,7 @@ export function TeammateForm({
   const [pictureFile, setPictureFile] = useState<File | null>(null)
   const [pictureRemoved, setPictureRemoved] = useState(false)
   const [pictureError, setPictureError] = useState<string | null>(null)
+  const serverModels = useServerModels()
   const preview = usePicturePreview(pictureFile)
   const picture = preview ?? (pictureRemoved ? null : savedPicture)
 
@@ -136,7 +141,8 @@ export function TeammateForm({
   const provider: Provider | undefined = addingKey
     ? newKeyProvider
     : providerKeys.find((key) => key.id === providerKeyId)?.provider
-  const catalog = provider ? models[provider] : []
+  const custom = provider === "openai_compatible"
+  const catalog = modelsFor(providerKeyId, newKeyProvider)
   const blindModel =
     Boolean(provider && modelId) &&
     !catalog.some((model) => model.id === modelId && model.vision)
@@ -149,35 +155,33 @@ export function TeammateForm({
     })),
     { value: NEW_KEY, label: "Add a new key" },
   ]
-  const modelOptions: SelectFieldOption[] = catalog.map((model) => ({
-    value: model.id,
-    label: model.label,
-    detail: model.vision ? "Can see and use its screen" : "Can't see screens",
-  }))
-
-  function inCatalog(of: Provider, modelId: string) {
-    return models[of].some((model) => model.id === modelId)
+  function modelsFor(keyId: string, newProvider: Provider): CatalogModel[] {
+    if (keyId !== NEW_KEY) {
+      return providerKeys.find((key) => key.id === keyId)?.models ?? []
+    }
+    return newProvider === "openai_compatible"
+      ? serverModels.models
+      : models[newProvider]
   }
 
-  function syncModel(next: Provider | undefined) {
-    if (!next) return
+  function syncModel(next: readonly CatalogModel[]) {
     const current = form.getValues("modelId")
-    if (models[next].length > 0) {
-      if (!inCatalog(next, current)) {
-        form.setValue("modelId", defaultModelId(models[next]))
-      }
-    } else if (provider && inCatalog(provider, current)) {
+    if (next.some((model) => model.id === current)) return
+    if (next.length > 0) form.setValue("modelId", defaultModelId(next))
+    else if (catalog.some((model) => model.id === current)) {
       form.setValue("modelId", "")
     }
   }
 
   function onKeyChange(keyId: string) {
-    if (keyId === NEW_KEY) {
-      syncModel(form.getValues("newKey.provider"))
-      return
-    }
-    form.resetField("newKey")
-    syncModel(providerKeys.find((key) => key.id === keyId)?.provider)
+    if (keyId !== NEW_KEY) form.resetField("newKey")
+    syncModel(modelsFor(keyId, form.getValues("newKey.provider")))
+  }
+
+  function loadNewKeyModels(open: boolean) {
+    if (!open || !addingKey || !custom) return
+    const { baseUrl, apiKey } = form.getValues("newKey")
+    serverModels.load(baseUrl, apiKey)
   }
 
   const preset = findPreset({
@@ -276,7 +280,9 @@ export function TeammateForm({
           <Section id="s-profile" title="Profile">
             <Card className="gap-3.5 px-4">
               <PictureField
-                hasPicture={picture !== null}
+                botId={botId}
+                name={name}
+                picture={picture}
                 error={pictureError}
                 onPick={pickPicture}
                 onRemove={removePicture}
@@ -287,12 +293,14 @@ export function TeammateForm({
                   name="name"
                   label="Name"
                   autoComplete="off"
+                  placeholder="Sam"
                 />
                 <TextField
                   control={form.control}
                   name="job"
                   label="Job"
                   autoComplete="off"
+                  placeholder="Answers customer emails"
                 />
               </div>
               <TextareaField
@@ -300,6 +308,7 @@ export function TeammateForm({
                 name="instructions"
                 label="Instructions"
                 rows={4}
+                placeholder="Reply in a warm, short way and sign as the Ace Shop team. Ask me before you offer a refund."
               />
             </Card>
           </Section>
@@ -331,34 +340,26 @@ export function TeammateForm({
                   }}
                   provider={newKeyProvider}
                   allowCustom={allowCustom}
-                  onProviderChange={syncModel}
+                  onProviderChange={(next) =>
+                    syncModel(modelsFor(NEW_KEY, next))
+                  }
                 />
               )}
-              {provider && catalog.length === 0 ? (
-                <TextField
-                  control={form.control}
-                  name="modelId"
-                  label="Model"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              ) : (
-                <SelectField
-                  control={form.control}
-                  name="modelId"
-                  label="Model"
-                  options={modelOptions}
-                  placeholder="Pick a model"
-                  disabled={!provider}
-                />
-              )}
+              <ModelField
+                control={form.control}
+                name="modelId"
+                label="Model"
+                choices={catalog.map((model) => modelChoice(model))}
+                allowTyped={custom}
+                disabled={!provider}
+                onOpenChange={loadNewKeyModels}
+              />
               {blindModel && (
                 <Alert className="sm:col-span-2">
                   <InfoIcon weight="duotone" />
                   <AlertDescription>
-                    With this model, {nameInSentence} can't see or use its
-                    screen, so it works only through commands and files. Pick a
-                    model that can see screens to let it use apps and websites.
+                    With this model, {nameInSentence} can't use its screen, so
+                    it can't work in apps or websites. Pick a model that can.
                   </AlertDescription>
                 </Alert>
               )}

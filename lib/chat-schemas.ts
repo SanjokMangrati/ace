@@ -7,6 +7,13 @@ const MESSAGE_MAX_LENGTH = 20_000
 
 export const chatIdSchema = z.uuid()
 
+export const chatCursorSchema = z.object({
+  updatedAt: z.date(),
+  id: chatIdSchema,
+})
+
+export type ChatCursor = z.infer<typeof chatCursorSchema>
+
 const messageSchema = z
   .string()
   .trim()

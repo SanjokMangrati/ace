@@ -22,7 +22,7 @@ export default async function HomePage() {
       <EmptyState
         heading="h1"
         title="Let's set up your first teammate"
-        description="A teammate is like a coworker with its own computer. You chat with it, hand it a task, and it gets it done. It checks with you before anything important."
+        description="A teammate is like a coworker with its own computer. Give it a task in a chat, and it checks with you before anything important."
         provider={keys[0]?.provider}
         hasTeammate={botCount > 0}
         className="w-full max-w-140"

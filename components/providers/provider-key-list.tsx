@@ -59,7 +59,9 @@ function RemoveKey({ row }: { row: ProviderKeyRow }) {
           <AlertDialogTitle>Remove your {row.label} key?</AlertDialogTitle>
           <AlertDialogDescription>
             {used
-              ? `${nameList(row.usedBy)} ${row.usedBy.length === 1 ? "uses" : "use"} this key. Until you pick another key in their settings, they can't work.`
+              ? row.usedBy.length === 1
+                ? `${row.usedBy[0]} uses this key and can't work until you pick another one in its settings.`
+                : `${nameList(row.usedBy)} use this key and can't work until you pick another one in their settings.`
               : "Ace deletes the key for good. You can add it again later."}
           </AlertDialogDescription>
           {error && <FieldError>{error}</FieldError>}

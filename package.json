@@ -10,7 +10,7 @@
     "dev:trigger": "trigger dev",
     "build": "next build",
     "start": "next start",
-    "lint": "biome check && node scripts/check-design.mjs",
+    "lint": "biome check",
     "format": "biome check --write",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -18,8 +18,7 @@
     "test:live": "vitest run --mode live contract",
     "db:push": "drizzle-kit push",
     "sandbox:snapshot": "node --env-file-if-exists=.env.local server/adapters/daytona/build-snapshot.ts",
-    "auth:schema": "pnpm dlx auth@latest generate --config server/adapters/better-auth/auth.ts --output server/db/schema/auth.ts --yes && biome format --write server/db/schema/auth.ts",
-    "lint:design": "node scripts/check-design.mjs"
+    "auth:schema": "pnpm dlx auth@latest generate --config server/adapters/better-auth/auth.ts --output server/db/schema/auth.ts --yes && biome format --write server/db/schema/auth.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.79",

@@ -50,14 +50,22 @@ export function ProviderKeyFields<TValues extends FieldValues>({
       <TextField
         control={control}
         name={names.apiKey}
-        label="API key"
+        label={
+          custom ? (
+            <>
+              API key
+              <span className="font-normal text-ink-3">(optional)</span>
+            </>
+          ) : (
+            "API key"
+          )
+        }
         type="password"
         autoComplete="off"
         spellCheck={false}
-        placeholder="Paste your key"
         description={
           custom
-            ? "Only if your server asks for one."
+            ? undefined
             : `Copy it from your ${PROVIDER_LABELS[provider]} account settings.`
         }
       />

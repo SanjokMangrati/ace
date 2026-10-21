@@ -8,11 +8,10 @@ import {
   NEW_KEY,
 } from "@/lib/bot-schemas"
 import { defaultModelId } from "@/lib/models"
-import { providerKeyOption } from "@/lib/provider-display"
 import { emptyProviderKey } from "@/lib/provider-key-schemas"
 import { modelCatalog } from "@/server/container"
-import { listProviderKeys } from "@/server/db/queries/provider-keys"
 import { env, teammateCaps } from "@/server/env"
+import { listProviderKeyModels } from "@/server/provider-key-models"
 import { requireUser } from "@/server/session"
 
 export const metadata: Metadata = {
@@ -22,13 +21,13 @@ export const metadata: Metadata = {
 export default async function NewTeammatePage() {
   const user = await requireUser()
   const [keys, models] = await Promise.all([
-    listProviderKeys(user.id).then((rows) => rows.map(providerKeyOption)),
+    listProviderKeyModels(user.id),
     modelCatalog.listAll(),
   ])
   const firstKey = keys[0]
 
   return (
-    <RouteModal fallback="/teammates" className="sm:max-w-180">
+    <RouteModal fallback="/teammates" className="sm:max-w-160">
       <TeammateForm
         mode="create"
         botId={crypto.randomUUID()}
@@ -44,7 +43,7 @@ export default async function NewTeammatePage() {
           instructions: "",
           providerKeyId: firstKey?.id ?? NEW_KEY,
           newKey: emptyProviderKey(),
-          modelId: defaultModelId(models[firstKey?.provider ?? "anthropic"]),
+          modelId: defaultModelId(firstKey?.models ?? models.anthropic),
           fullAuto: false,
           ...cappedLimits(DEFAULT_LIMITS, teammateCaps),
           askBefore: DEFAULT_ASK_BEFORE,

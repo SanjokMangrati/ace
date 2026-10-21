@@ -101,7 +101,7 @@ function Answered({
   return (
     <p className="inline-flex flex-wrap items-center gap-2 text-body text-ink-3">
       <Icon weight="regular" className="size-4.5 shrink-0" />
-      {allowed ? "You allowed this" : "You said no"}
+      {allowed ? "You allowed this" : "You didn't allow this"}
       {ask.answeredAt !== undefined && (
         <>
           {" · "}
@@ -161,12 +161,14 @@ export function PermissionCard({
           </div>
         </div>
         {ask.step.kind === "screen" && ask.shot && (
-          <Screenshot
-            shot={ask.shot}
-            at={at}
-            mark="needs-you"
-            className="ml-12.5 w-65"
-          />
+          <div className="pl-12.5">
+            <Screenshot
+              shot={ask.shot}
+              at={at}
+              mark="needs-you"
+              className="w-65"
+            />
+          </div>
         )}
         {details && (
           <ShowDetails details={details} className="ml-12.5 text-body" />

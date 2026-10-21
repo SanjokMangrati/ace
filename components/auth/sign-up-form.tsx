@@ -57,7 +57,6 @@ export function SignUpForm({
         name="name"
         label="Your name"
         autoComplete="name"
-        placeholder="Sam Rivera"
       />
       <TextField
         control={form.control}
@@ -65,7 +64,6 @@ export function SignUpForm({
         label="Email"
         type="email"
         autoComplete="email"
-        placeholder="you@example.com"
       />
       <PasswordField
         control={form.control}

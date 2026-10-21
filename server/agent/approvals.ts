@@ -10,8 +10,7 @@ import {
   type Verdict,
 } from "./risk"
 
-export const JUDGE_FAILED =
-  "This couldn't be checked for safety, so it waits for you to look at it first."
+export const JUDGE_FAILED = "Ace couldn't check this for safety."
 const NOT_ALLOWED = "The person didn't allow this."
 
 export type ApprovalReason = (typeof approvalReason.enumValues)[number]

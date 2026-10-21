@@ -28,7 +28,6 @@ export default async function TeammatesPage() {
       header={
         <PageHeader
           title="Teammates"
-          description="Each teammate has its own computer, does one task at a time, and remembers what it learns."
           action={
             <Link href="/teammates/new" className={buttonVariants()}>
               <PlusIcon weight="regular" data-icon="inline-start" />
@@ -55,7 +54,7 @@ export default async function TeammatesPage() {
       ) : (
         <EmptyState
           title="Meet your first teammate"
-          description="Teammates work on their own computer and check with you before anything important."
+          description="Each teammate has its own computer, remembers what it learns and checks with you before anything important."
           provider={keys[0]?.provider}
           hasTeammate={false}
           className="py-10"

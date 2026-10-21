@@ -72,10 +72,10 @@ describe("botFormSchema", () => {
       "Spend at least $0.01 on one task.",
     ])
     expect(messages({ ...valid, dailyBudgetUsd: Number.NaN })).toEqual([
-      "Enter an amount for a day, like 1.00.",
+      "Enter an amount, like 1.00.",
     ])
     expect(messages({ ...valid, dailyBudgetUsd: null })).toEqual([
-      "Enter an amount for a day, like 1.00.",
+      "Enter an amount, like 1.00.",
     ])
   })
 

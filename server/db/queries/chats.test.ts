@@ -1,9 +1,10 @@
 import type { UIMessage } from "ai"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import { db } from "@/server/db/client"
 import * as schema from "@/server/db/schema"
 import {
+  CHAT_PAGE_SIZE,
   endRunningTurns,
   findChat,
   findChatBotIds,
@@ -195,7 +196,9 @@ describe("approvals", () => {
   }
 
   async function status() {
-    const [row] = await listChats("user-1")
+    const {
+      chats: [row],
+    } = await listChats("user-1")
     return { working: row.working, needsYou: row.needsYou }
   }
 
@@ -419,5 +422,42 @@ describe("chat model", () => {
       modelId: "m",
       shown: { providerKeyId: defaultKeyId, modelId: "m" },
     })
+  })
+})
+
+describe("chat list pages", () => {
+  it("pages through every chat once, newest first, when chats share a millisecond", async () => {
+    await db
+      .insert(schema.user)
+      .values({ id: "user-2", name: "Lee", email: "lee@example.com" })
+    const base = Date.UTC(2026, 0, 1)
+    const chatIds = Array.from(
+      { length: CHAT_PAGE_SIZE + 5 },
+      (_, index) =>
+        `00000000-0000-4000-8000-${String(100 + index).padStart(12, "0")}`
+    )
+    await db.insert(schema.chat).values(
+      chatIds.map((id, index) => ({
+        id,
+        userId: "user-2",
+        title: id,
+        updatedAt: sql`${new Date(base + Math.floor(index / 4)).toISOString()}::timestamp + make_interval(secs => ${(index % 4) * 0.0001})`,
+      }))
+    )
+
+    const first = await listChats("user-2")
+    const last = first.chats.at(-1)
+    if (!last) throw new Error("expected a first page")
+    const second = await listChats("user-2", {
+      updatedAt: last.updatedAt,
+      id: last.id,
+    })
+
+    expect(first.chats).toHaveLength(CHAT_PAGE_SIZE)
+    expect(first.hasMore).toBe(true)
+    expect(second.hasMore).toBe(false)
+    expect([...first.chats, ...second.chats].map((row) => row.id)).toEqual(
+      chatIds.toReversed()
+    )
   })
 })

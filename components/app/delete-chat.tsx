@@ -24,6 +24,7 @@ export function DeleteChatDialog({
   active,
   open,
   onOpenChange,
+  onDeleted,
 }: {
   chatId: string
   title: string
@@ -31,19 +32,23 @@ export function DeleteChatDialog({
   active: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
+  onDeleted?: () => void
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
   const { pending, error, run } = useAction()
   const names = nameList(teammateNames)
   const keeps =
     teammateNames.length > 1
-      ? "keep their computers, their files and what they remember"
-      : "keeps its computer, its files and what it remembers"
+      ? "keep their computers, files and what they remember"
+      : "keeps its computer, files and what it remembers"
 
   function confirm() {
     run(
       () => deleteChat(chatId, active),
-      () => onOpenChange(false)
+      () => {
+        onOpenChange(false)
+        onDeleted?.()
+      }
     )
   }
 
@@ -53,8 +58,8 @@ export function DeleteChatDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this chat with {names}?</AlertDialogTitle>
           <AlertDialogDescription>
-            “{title}” and its messages will be deleted for good. {names} {keeps}
-            .
+            <span className="text-body-strong text-ink">{title}</span> and its
+            messages are deleted for good. {names} {keeps}.
           </AlertDialogDescription>
           {error && <FieldError>{error}</FieldError>}
         </AlertDialogHeader>

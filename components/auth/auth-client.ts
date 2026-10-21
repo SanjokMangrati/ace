@@ -17,7 +17,7 @@ export function authErrorMessage(error: AuthClientError) {
     return "That email and password don't match an account. Check both and try again."
   }
   if (error.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL") {
-    return "We couldn't create your account. Try signing in or use a different email."
+    return "We couldn't create your account. Sign in, or use a different email."
   }
   return error.message || SOMETHING_WENT_WRONG
 }

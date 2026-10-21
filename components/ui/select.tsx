@@ -17,6 +17,9 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
   )
 }
 
+const selectTriggerClassName =
+  "flex min-h-control w-full min-w-0 cursor-pointer items-center justify-between gap-2.5 rounded-sm border border-input bg-surface px-3 py-1 text-left text-body text-ink transition-colors duration-150 ease-out focus-visible:outline-offset-1 aria-invalid:border-danger data-disabled:cursor-not-allowed data-disabled:opacity-45 data-placeholder:text-ink-3"
+
 function SelectTrigger({
   className,
   children,
@@ -25,10 +28,7 @@ function SelectTrigger({
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
-      className={cn(
-        "flex min-h-control w-full min-w-0 cursor-pointer items-center justify-between gap-2.5 rounded-sm border border-input bg-surface px-3 py-1 text-left text-body text-ink transition-colors duration-150 ease-out focus-visible:outline-offset-1 aria-invalid:border-danger data-disabled:cursor-not-allowed data-disabled:opacity-45 data-placeholder:text-ink-3",
-        className
-      )}
+      className={cn(selectTriggerClassName, className)}
       {...props}
     >
       {children}
@@ -136,4 +136,5 @@ export {
   SelectOption,
   SelectTrigger,
   SelectValue,
+  selectTriggerClassName,
 }

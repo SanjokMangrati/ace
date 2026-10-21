@@ -39,22 +39,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import type { SidebarChat } from "@/lib/chat"
 import { chatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { AuthUser } from "@/server/ports/auth"
+import { type ChatPages, LoadMoreChats } from "./chat-pages"
 import { DeleteChatDialog } from "./delete-chat"
 import { type LiveStatus, useLiveChats } from "./live-chat"
-
-export type SidebarChat = {
-  id: string
-  title: string
-  updatedAt: Date
-  working: boolean
-  queued: boolean
-  needsYou: boolean
-  inControl: boolean
-  teammates: { id: string; name: string; picture: string | null }[]
-}
 
 const SIDEBAR_FACES = 2
 
@@ -184,11 +175,13 @@ function ChatRow({
   active,
   status,
   onNavigate,
+  onDeleted,
 }: {
   chat: SidebarChat
   active: boolean
   status: LiveStatus
   onNavigate?: () => void
+  onDeleted: () => void
 }) {
   const [deleting, setDeleting] = useState(false)
 
@@ -228,7 +221,7 @@ function ChatRow({
         >
           <DotsThreeIcon weight="regular" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align="end" className="w-auto">
           <DropdownMenuItem variant="danger" onClick={() => setDeleting(true)}>
             <TrashIcon weight="duotone" />
             Delete chat
@@ -242,6 +235,7 @@ function ChatRow({
         active={active}
         open={deleting}
         onOpenChange={setDeleting}
+        onDeleted={onDeleted}
       />
     </div>
   )
@@ -266,16 +260,17 @@ function RailTooltip({
 
 function SidebarRail({
   user,
-  chats,
+  pages,
   onExpand,
 }: {
   user: AuthUser
-  chats: SidebarChat[]
+  pages: ChatPages
   onExpand: () => void
 }) {
   const pathname = usePathname()
   const live = useLiveChats()
   const { signingOut, signOut } = useSignOut()
+  const { chats } = pages
   const chatOpen = chats.some((chat) => pathname === `/chats/${chat.id}`)
 
   return (
@@ -363,6 +358,9 @@ function SidebarRail({
                 Your chats show up here.
               </p>
             )}
+            {pages.hasMore && (
+              <LoadMoreChats key={chats.length} pages={pages} />
+            )}
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -395,14 +393,14 @@ function SidebarRail({
 
 export function AppSidebar({
   user,
-  chats,
+  pages,
   collapsed,
   onNavigate,
   onCollapse,
   onExpand,
 }: {
   user: AuthUser
-  chats: SidebarChat[]
+  pages: ChatPages
   collapsed?: boolean
   onNavigate?: () => void
   onCollapse?: () => void
@@ -413,13 +411,13 @@ export function AppSidebar({
   const { signingOut, signOut } = useSignOut()
 
   if (collapsed && onExpand) {
-    return <SidebarRail user={user} chats={chats} onExpand={onExpand} />
+    return <SidebarRail user={user} pages={pages} onExpand={onExpand} />
   }
 
   return (
     <nav
       aria-label="Ace"
-      className="flex h-full w-sidebar max-w-full flex-col gap-0.5 overflow-y-auto border-r border-line bg-sidebar px-2.5 py-3.5"
+      className="flex h-full w-sidebar max-w-full flex-col gap-0.5 border-r border-line bg-sidebar px-2.5 py-3.5"
     >
       <div className="flex items-center justify-between pr-1 pb-3 pl-2">
         <Link href="/" onClick={onNavigate} aria-label="Ace home">
@@ -462,22 +460,27 @@ export function AppSidebar({
       <div className="px-2.5 pt-4.5 pb-1.5 font-display text-caption font-medium text-ink-3">
         Chats
       </div>
-      {chats.length > 0 ? (
-        chats.map((chat) => (
-          <ChatRow
-            key={chat.id}
-            chat={chat}
-            active={pathname === `/chats/${chat.id}`}
-            status={live[chat.id] ?? chat}
-            onNavigate={onNavigate}
-          />
-        ))
-      ) : (
-        <p className="px-2.5 py-1 text-small text-ink-3">
-          Your chats show up here.
-        </p>
-      )}
-      <div className="min-h-6 flex-1" />
+      <div className="-mx-2.5 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5">
+        {pages.chats.length > 0 ? (
+          pages.chats.map((chat) => (
+            <ChatRow
+              key={chat.id}
+              chat={chat}
+              active={pathname === `/chats/${chat.id}`}
+              status={live[chat.id] ?? chat}
+              onNavigate={onNavigate}
+              onDeleted={() => pages.forget(chat.id)}
+            />
+          ))
+        ) : (
+          <p className="px-2.5 py-1 text-small text-ink-3">
+            Your chats show up here.
+          </p>
+        )}
+        {pages.hasMore && (
+          <LoadMoreChats key={pages.chats.length} pages={pages} />
+        )}
+      </div>
       <div className="mt-2 flex items-center gap-2.5 border-t border-line pt-2.5 pr-1.5 pl-2">
         <YouAvatar user={user} />
         <span className="min-w-0 flex-1 text-small">

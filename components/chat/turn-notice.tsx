@@ -39,8 +39,7 @@ export function UpNextNotice({
     <Alert>
       <HourglassMediumIcon weight="duotone" />
       <AlertDescription>
-        {name} is finishing <b>{queue.title}</b> first. It'll start on this
-        right after.
+        {name} is finishing <b>{queue.title}</b> first, then starts on this.
       </AlertDescription>
     </Alert>
   )
@@ -76,8 +75,8 @@ export function TurnNotice({
           <b>
             {name} stopped after {notice.steps}{" "}
             {notice.steps === 1 ? "step" : "steps"}
-          </b>{" "}
-          so it doesn't run on forever.
+          </b>
+          , its limit for one task.
         </AlertDescription>
         <AlertAction>
           {onKeepGoing && (

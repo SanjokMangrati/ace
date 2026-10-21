@@ -8,12 +8,11 @@ import { TeammateForm } from "@/components/teammates/teammate-form"
 import { TeammateMemory } from "@/components/teammates/teammate-memory"
 import { botIdSchema, NEW_KEY } from "@/lib/bot-schemas"
 import { teammatePictureUrl } from "@/lib/format"
-import { providerKeyOption } from "@/lib/provider-display"
 import { emptyProviderKey } from "@/lib/provider-key-schemas"
 import { modelCatalog } from "@/server/container"
 import { findBot } from "@/server/db/queries/bots"
-import { listProviderKeys } from "@/server/db/queries/provider-keys"
 import { env, teammateCaps } from "@/server/env"
+import { listProviderKeyModels } from "@/server/provider-key-models"
 import { requireUser } from "@/server/session"
 
 const loadBot = cache(async (botId: string) => {
@@ -39,7 +38,7 @@ export default async function TeammatePage({
   const { user, bot } = await loadBot((await params).botId)
   const { show } = await searchParams
   const [keys, models] = await Promise.all([
-    listProviderKeys(user.id).then((rows) => rows.map(providerKeyOption)),
+    listProviderKeyModels(user.id),
     modelCatalog.listAll(),
   ])
   const picture = teammatePictureUrl(bot)
@@ -48,7 +47,7 @@ export default async function TeammatePage({
     <RouteModal
       fallback="/teammates"
       focusId={show === "limits" ? "maxSteps" : undefined}
-      className="sm:max-w-180"
+      className="sm:max-w-160"
     >
       <TeammateForm
         key={bot.updatedAt.getTime()}
