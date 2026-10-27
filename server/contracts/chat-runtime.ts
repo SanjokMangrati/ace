@@ -10,6 +10,10 @@ export function chatRuntimeContract(name: string, make: () => ChatRuntime) {
       expect(token.length).toBeGreaterThan(0)
     })
 
+    it("has no run for a chat without a session", async () => {
+      await expect(make().isRunning(randomUUID())).resolves.toBe(false)
+    })
+
     it("makes a wait and finishes it", async () => {
       const runtime = make()
       const ref = await runtime.createWait(60)

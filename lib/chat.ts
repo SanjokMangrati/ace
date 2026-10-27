@@ -59,6 +59,7 @@ export type TurnNotice =
   | { reason: "step_limit"; steps: number }
   | { reason: "task_budget" | "daily_budget"; limitUsd: number }
   | { reason: "error"; message: string }
+  | { reason: "interrupted" }
 
 type ComputerUITool = {
   input: z.input<typeof computerInputSchema> | NativeComputerInput

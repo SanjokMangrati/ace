@@ -130,6 +130,7 @@ export function TeammateReply({
   message,
   working,
   error,
+  cutOff,
   answeredAt,
   onKeepGoing,
   onAnswer,
@@ -139,6 +140,7 @@ export function TeammateReply({
   message: TeammateMessage | undefined
   working: boolean
   error?: string
+  cutOff?: boolean
   answeredAt?: Record<string, number>
   onKeepGoing?: () => void
   onAnswer?: (approvalId: string, approved: boolean) => void
@@ -147,12 +149,16 @@ export function TeammateReply({
     ? readMessage(message, new Map(team.map((bot) => [bot.id, bot.name])))
     : { segments: [EMPTY], notices: [], queue: undefined }
   const upNext = working && queue?.startedAt === undefined ? queue : undefined
-  const shownNotices: TurnNoticeData[] =
+  const createdAt = message?.metadata?.createdAt
+  const finishedAt = message?.metadata?.finishedAt
+  const withError: TurnNoticeData[] =
     error && !notices.some((notice) => notice.reason === "error")
       ? [...notices, { reason: "error", message: error }]
       : notices
-  const createdAt = message?.metadata?.createdAt
-  const finishedAt = message?.metadata?.finishedAt
+  const shownNotices: TurnNoticeData[] =
+    cutOff && !working && finishedAt === undefined && withError.length === 0
+      ? [{ reason: "interrupted" }]
+      : withError
   const durationMs = (index: number) => {
     const startedAt =
       index === 0

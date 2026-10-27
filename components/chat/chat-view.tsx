@@ -151,6 +151,7 @@ export function ChatView({
   const router = useRouter()
   const transport = useChatTransport(chatId, session)
   const [resume] = useState(initialMessages.length > 0)
+  const [resuming, setResuming] = useState(resume)
   const [failures, setFailures] = useState<Record<string, string>>({})
   const [answeredAt, setAnsweredAt] = useState<Record<string, number>>({})
   const [handedOn, setHandedOn] = useState<TeammateMessage>()
@@ -236,7 +237,14 @@ export function ChatView({
         part.state === "approval-requested" &&
         !part.approval.isAutomatic
     )
-  const canSend = nextUp.connected && !working && !inControl && !needsYou
+  const unanswered =
+    !working &&
+    !resuming &&
+    last?.role === "user" &&
+    !last.metadata?.control &&
+    !last.metadata?.handoff
+  const canSend =
+    nextUp.connected && !working && !resuming && !inControl && !needsYou
   useReportLiveChat(chatId, { working, queued, needsYou })
 
   useEffect(() => {
@@ -294,7 +302,7 @@ export function ChatView({
   }, [])
 
   const resumeOnMount = useEffectEvent(() => {
-    resumeStream()
+    resumeStream().finally(() => setResuming(false))
   })
 
   useEffect(() => {
@@ -332,6 +340,7 @@ export function ChatView({
                 message={message}
                 working={working && index === messages.length - 1}
                 error={failures[message.id]}
+                cutOff={!resuming}
                 answeredAt={answeredAt}
                 onKeepGoing={
                   index === messages.length - 1 && canSend
@@ -352,15 +361,17 @@ export function ChatView({
               />
             )
           )}
-          {last?.role === "user" && (status === "submitted" || error) && (
-            <TeammateReply
-              teammate={current}
-              team={teammates}
-              message={undefined}
-              working={status === "submitted"}
-              error={error && (error.message || SOMETHING_WENT_WRONG)}
-            />
-          )}
+          {last?.role === "user" &&
+            (status === "submitted" || error || unanswered) && (
+              <TeammateReply
+                teammate={current}
+                team={teammates}
+                message={undefined}
+                working={status === "submitted"}
+                error={error && (error.message || SOMETHING_WENT_WRONG)}
+                cutOff={unanswered}
+              />
+            )}
         </ConversationContent>
       </Conversation>
 

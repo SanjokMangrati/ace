@@ -100,6 +100,12 @@ function fileName(path: string | undefined) {
   return path.split("/").filter(Boolean).at(-1) ?? path
 }
 
+function midSentence(text: string | undefined) {
+  return text && /^[A-Z][a-z]/.test(text)
+    ? text.charAt(0).toLowerCase() + text.slice(1)
+    : text
+}
+
 function toolState(state: string): StepState {
   if (state === "output-available") return "done"
   if (state === "output-error" || state === "output-denied") return "failed"
@@ -139,7 +145,7 @@ function stepOf(
         key: part.toolCallId,
         kind: "command",
         state: toolState(part.state),
-        purpose: part.input?.purpose,
+        purpose: midSentence(part.input?.purpose),
         command: part.input?.command,
         output:
           part.state === "output-available" ? part.output.output : undefined,

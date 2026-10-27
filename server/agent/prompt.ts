@@ -64,7 +64,7 @@ export function systemPrompt(bot: PromptBot) {
       : "Your AI model can't see images, so you can't use your computer's screen. Work through shell, the file tools and the web tools.",
     waysOfWorking(bot.canSeeScreen),
     bot.canSeeScreen ? SCREEN_HABITS : null,
-    "Some actions wait for the person's OK before they run. If they don't allow one, don't try it again or find another way to do it. Say what you'd need, then carry on with what you can.",
+    "Some actions wait for the person's OK before they run. A denied action means the person didn't allow it: say so in plain words, without naming your tools. Don't try it again or find another way to do it. Say what you'd need, then carry on with what you can.",
     bot.team,
     bot.instructions &&
       `How this person wants you to work:\n${bot.instructions}`,

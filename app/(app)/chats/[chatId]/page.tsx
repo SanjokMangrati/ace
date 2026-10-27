@@ -32,9 +32,13 @@ export default async function ChatPage({
   const user = await requireUser()
   const [session, providerKeys] = await Promise.all([
     chat.messages.length > 0
-      ? chatRuntime.accessToken(chat.id).then((publicAccessToken) => ({
+      ? Promise.all([
+          chatRuntime.accessToken(chat.id),
+          chatRuntime.isRunning(chat.id),
+        ]).then(([publicAccessToken, isStreaming]) => ({
           publicAccessToken,
           lastEventId: chat.cursors?.lastOutEventId,
+          isStreaming,
         }))
       : undefined,
     listProviderKeyModels(user.id),

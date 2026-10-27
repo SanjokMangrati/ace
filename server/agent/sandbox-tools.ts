@@ -27,7 +27,7 @@ export function sandboxTools(open: () => Promise<Sandbox>) {
           .min(1)
           .max(120)
           .describe(
-            "What the command is for, in plain words that finish the sentence 'Ran a command to …', like 'compare the totals'. The person sees this."
+            "What the command is for, in plain lowercase words that finish the sentence 'Ran a command to …', like 'compare the totals' or 'check the home folder' (never 'my'). The person sees this."
           ),
         command: z.string().min(1).max(10_000),
         cwd: path

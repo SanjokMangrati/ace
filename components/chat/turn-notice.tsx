@@ -58,6 +58,17 @@ export function TurnNotice({
 }) {
   if (notice.reason === "error") return <ErrorNotice message={notice.message} />
 
+  if (notice.reason === "interrupted") {
+    return (
+      <Alert>
+        <InfoIcon weight="duotone" />
+        <AlertDescription>
+          {name} stopped before finishing. Send a message to carry on.
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
   const changeLimit = (label: string) => (
     <Link
       href={`${settingsHref}?show=limits`}

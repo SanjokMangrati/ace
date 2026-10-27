@@ -12,6 +12,7 @@ export function createFakeChatRuntime(
       return { publicAccessToken: `token-${chatId}` }
     },
     accessToken: async (chatId) => `token-${chatId}`,
+    isRunning: async (chatId) => sessions.get(chatId) === "open",
     closeSession: async (chatId) => {
       if (sessions.has(chatId)) sessions.set(chatId, "closed")
     },

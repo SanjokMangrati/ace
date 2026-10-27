@@ -124,6 +124,28 @@ describe("TeammateReply asking for permission", () => {
     ])
   })
 
+  it("keeps the purpose lowercase in the middle of the sentence", () => {
+    const message = asking({})
+    const [, shell] = message.parts
+    if (shell.type === "tool-shell" && shell.input) {
+      shell.input.purpose = "Send the report"
+    }
+    render(
+      <TeammateReply
+        teammate={teammate}
+        team={[teammate]}
+        message={message}
+        working={false}
+        onAnswer={() => {}}
+      />
+    )
+    expect(
+      screen.getByRole("heading", {
+        name: "Researcher wants to send the report",
+      })
+    ).toBeTruthy()
+  })
+
   it("makes saying no the main answer for careful asks", () => {
     render(
       <TeammateReply
@@ -158,6 +180,37 @@ describe("TeammateReply asking for permission", () => {
       />
     )
     expect(screen.getByText("Worked for 3 minutes")).toBeTruthy()
+  })
+
+  it("says when a reply stopped before finishing", () => {
+    const stopped =
+      "Researcher stopped before finishing. Send a message to carry on."
+    const message: TeammateMessage = {
+      id: "m1",
+      role: "assistant",
+      metadata: { createdAt: 0 },
+      parts: [{ type: "text", text: "Half of it", state: "done" }],
+    }
+    const { rerender } = render(
+      <TeammateReply
+        teammate={teammate}
+        team={[teammate]}
+        message={message}
+        working={false}
+        cutOff
+      />
+    )
+    expect(screen.getByText(stopped)).toBeTruthy()
+    rerender(
+      <TeammateReply
+        teammate={teammate}
+        team={[teammate]}
+        message={{ ...message, metadata: { createdAt: 0, finishedAt: 1 } }}
+        working={false}
+        cutOff
+      />
+    )
+    expect(screen.queryByText(stopped)).toBeNull()
   })
 
   it("keeps the time it worked before asking once you answered", () => {

@@ -52,6 +52,7 @@ import {
   turnNotice,
 } from "@/server/agent/limits"
 import { noteTools } from "@/server/agent/notes"
+import { forgetItemIds } from "@/server/agent/partial-reply"
 import { systemPrompt } from "@/server/agent/prompt"
 import { judgeRisk, type ToolRisk } from "@/server/agent/risk"
 import { sandboxTools } from "@/server/agent/sandbox-tools"
@@ -284,6 +285,13 @@ async function handBackMessage(
   }
 }
 
+async function endDeadTurns(chatId: string) {
+  const ended = await endRunningTurns(chatId)
+  await Promise.all(
+    ended.map((row) => releaseTurnLease(runtime, row.botId, row.id))
+  )
+}
+
 function stamp(started: "createdAt" | "resumedAt", botId?: string) {
   return ({ part }: { part: { type: string } }) => {
     if (part.type === "start") return { [started]: Date.now(), botId }
@@ -312,18 +320,24 @@ export const teammateChat = chat
     onBoot: () => {
       turn.init({ current: null })
     },
+    onRecoveryBoot: ({ settledMessages, inFlightUsers, partialAssistant }) => {
+      const [answering, ...followUps] = inFlightUsers
+      if (!partialAssistant || !answering || followUps.length === 0) return
+      return {
+        chain: [...settledMessages, answering, forgetItemIds(partialAssistant)],
+        recoveredTurns: followUps,
+      }
+    },
     onAction: ({ action }) => {
       chat.history.set([
         ...chat.history.all(),
         controlMessage(action.messageId, action.control),
       ])
     },
+    onCancel: ({ payload }) => endDeadTurns(payload.chatId),
     onFailure: async ({ payload, error }) => {
       log.error("Chat run failed", { chatId: payload.chatId, err: error })
-      const ended = await endRunningTurns(payload.chatId)
-      await Promise.all(
-        ended.map((row) => releaseTurnLease(runtime, row.botId, row.id))
-      )
+      await endDeadTurns(payload.chatId)
     },
     run: async ({ chatId, messages, tools, signal, streamText }) => {
       const history = chat.history.all() as TeammateMessage[]
@@ -558,10 +572,13 @@ export const teammateChat = chat
         },
       })
     },
-    onBeforeTurnComplete: async ({ writer, stopped }) => {
+    onBeforeTurnComplete: async ({ writer, stopped, responseMessage }) => {
       const current = turn.current
       if (!current) return
       turn.current = null
+      if (responseMessage && (stopped || current.failed)) {
+        chat.history.replace(responseMessage.id, forgetItemIds(responseMessage))
+      }
 
       const usage = totalUsage(current.steps)
       const totals: TurnTotals = {
