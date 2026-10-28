@@ -55,6 +55,12 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           pnpm dlx vercel@64.5.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
-          pnpm dlx vercel@64.5.0 build --prod --token="$VERCEL_TOKEN"
+          sed -i '/^[A-Z0-9_]*=""$/d' .vercel/.env.production.local
+          DATABASE_URL=postgres://build@localhost/build \
+          BETTER_AUTH_SECRET=build-only-placeholder-never-used-at-runtime \
+          ENCRYPTION_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+          TRIGGER_SECRET_KEY=build \
+          DAYTONA_API_KEY=build \
+            pnpm dlx vercel@64.5.0 build --prod --token="$VERCEL_TOKEN"
           pnpm dlx vercel@64.5.0 deploy --prebuilt --prod --token="$VERCEL_TOKEN" \
             --env TRIGGER_EXTERNAL_DEPLOYMENT_ID="$SHA"
