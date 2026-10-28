@@ -1,6 +1,11 @@
 import { Daytona, DaytonaNotFoundError, Image } from "@daytona/sdk"
 
 const name = process.env.DAYTONA_SNAPSHOT || "ace-desktop"
+const resources = {
+  cpu: Number(process.env.SANDBOX_CPU || 2),
+  memory: Number(process.env.SANDBOX_MEMORY_GIB || 4),
+  disk: Number(process.env.SANDBOX_DISK_GIB || 10),
+}
 const daytona = new Daytona()
 
 function print(line: string) {
@@ -26,7 +31,7 @@ if (await exists()) {
     {
       name,
       image: Image.fromDockerfile("sandbox/image/Dockerfile"),
-      resources: { cpu: 2, memory: 4, disk: 10 },
+      resources,
     },
     { onLogs: print }
   )

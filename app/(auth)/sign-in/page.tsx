@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { SignInForm } from "@/components/auth/sign-in-form"
 import { safeRedirect } from "@/lib/safe-redirect"
 import { auth } from "@/server/container"
+import { env } from "@/server/env"
 import { getSession } from "@/server/session"
 
 export const metadata: Metadata = {
@@ -32,6 +33,7 @@ export default async function SignInPage({
       next={target}
       providers={auth.socialProviders}
       signUpEnabled={auth.signUpEnabled}
+      demo={env.DEMO_MODE}
       initialError={initialError}
     />
   )

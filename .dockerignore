@@ -1,0 +1,11 @@
+.git
+.next
+.trigger
+.env*
+node_modules
+scripts
+coverage
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+docker-compose.yml

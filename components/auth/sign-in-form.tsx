@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
+import { DemoSignInNotice } from "@/components/app/demo-notices"
 import { FormError } from "@/components/form/form-error"
 import { PasswordField } from "@/components/form/password-field"
 import { SubmitButton } from "@/components/form/submit-button"
@@ -9,6 +10,7 @@ import { TextField } from "@/components/form/text-field"
 import { FieldSeparator } from "@/components/ui/field"
 import { TextLink } from "@/components/ui/text-link"
 import { type SignInInput, signInSchema } from "@/lib/auth-schemas"
+import { DEMO_ACCOUNT } from "@/lib/demo"
 import { withNext } from "@/lib/safe-redirect"
 import type { SocialProvider } from "@/server/ports/auth"
 import { authClient, authErrorMessage } from "./auth-client"
@@ -19,16 +21,20 @@ export function SignInForm({
   next,
   providers,
   signUpEnabled,
+  demo,
   initialError,
 }: {
   next: string
   providers: readonly SocialProvider[]
   signUpEnabled: boolean
+  demo: boolean
   initialError?: string
 }) {
   const form = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: demo
+      ? { email: DEMO_ACCOUNT.email, password: DEMO_ACCOUNT.password }
+      : { email: "", password: "" },
   })
 
   async function onSubmit(values: SignInInput) {
@@ -49,6 +55,7 @@ export function SignInForm({
       className="flex flex-col gap-5"
     >
       <AuthHeader title="Welcome back" />
+      {demo && <DemoSignInNotice />}
       <FormError control={form.control} initialMessage={initialError} />
       <TextField
         control={form.control}

@@ -1,5 +1,6 @@
 import { LockIcon } from "@phosphor-icons/react/ssr"
 import type { Metadata } from "next"
+import { DemoKeysNotice } from "@/components/app/demo-notices"
 import { Section } from "@/components/app/page"
 import { RouteModal } from "@/components/app/route-modal"
 import { AddProviderKeyForm } from "@/components/providers/add-provider-key-form"
@@ -42,6 +43,7 @@ export default async function ProvidersModal() {
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-5">
+        {env.DEMO_MODE && <DemoKeysNotice />}
         <Section id="s-keys" title="Your keys">
           {rows.length > 0 && <ProviderKeyList rows={rows} />}
           <Alert role="note">

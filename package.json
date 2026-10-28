@@ -4,6 +4,10 @@
   "type": "module",
   "author": "Sanjok Mangrati",
   "private": true,
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "concurrently -k -n next,trigger -c auto pnpm:dev:next pnpm:dev:trigger",
     "dev:next": "next dev",
@@ -12,7 +16,7 @@
     "start": "next start",
     "lint": "biome check",
     "format": "biome check --write",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:live": "vitest run --mode live contract",

@@ -26,6 +26,7 @@ const schema = z
     GITHUB_CLIENT_ID: optionalString,
     GITHUB_CLIENT_SECRET: optionalString,
     DISABLE_SIGN_UP: z.stringbool().default(false),
+    DEMO_MODE: z.stringbool().default(false),
     ENCRYPTION_KEY: z
       .base64()
       .refine((value) => Buffer.from(value, "base64").length === 32, {

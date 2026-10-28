@@ -5,9 +5,10 @@ import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@/lib/auth-schemas"
 import { db } from "@/server/db/client"
 import * as schema from "@/server/db/schema"
 import { env } from "@/server/env"
+import { demo } from "./demo"
 
 const github =
-  env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+  !demo && env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
     ? {
         github: {
           clientId: env.GITHUB_CLIENT_ID,
@@ -22,7 +23,7 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: {
     enabled: true,
-    disableSignUp: env.DISABLE_SIGN_UP,
+    disableSignUp: env.DISABLE_SIGN_UP || !!demo,
     minPasswordLength: PASSWORD_MIN_LENGTH,
     maxPasswordLength: PASSWORD_MAX_LENGTH,
   },
@@ -37,4 +38,5 @@ export const auth = betterAuth({
     storage: "database",
   },
   plugins: [nextCookies()],
+  ...demo,
 })
