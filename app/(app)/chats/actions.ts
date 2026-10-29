@@ -117,7 +117,11 @@ export async function loadMoreChats(after: ChatCursor) {
 
 export async function chatStatuses(chatIds: string[]) {
   const user = await requireUser()
-  return listChatStatuses(user.id, chatIdSchema.array().parse(chatIds))
+  const statuses = await listChatStatuses(
+    user.id,
+    chatIdSchema.array().parse(chatIds)
+  )
+  return { ok: true as const, statuses }
 }
 
 export async function startChatSession(chatId: string) {

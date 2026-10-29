@@ -23,6 +23,7 @@ const JUDGE_INPUT_CHARS = 4000
 const REASON_MAX_CHARS = 300
 
 const WORKSPACE = /^(~|\$HOME|\/home\/|\/tmp\/|[^/~$])/
+const PARENT_DIR = /(^|\/)\.\.(\/|$)/
 const SCREEN_CHANGES = new Set(["click", "drag", "type", "key"])
 const JUDGED_SCREEN = new Set(["click", "type"])
 const SUBMITS = /(^|[\s+])(enter|return)($|[\s+])/i
@@ -80,6 +81,10 @@ function isCardNumber(text: string) {
   return false
 }
 
+function inWorkspace(path: string) {
+  return WORKSPACE.test(path) && !PARENT_DIR.test(path)
+}
+
 function deletesOutside(command: string) {
   for (const segment of command.split(/&&|\|\||[;|\n]/)) {
     const words = segment.trim().split(/\s+/)
@@ -90,7 +95,7 @@ function deletesOutside(command: string) {
       targets.some(
         (target) =>
           ["/", "/*", "~", "~/", "$HOME"].includes(target) ||
-          !WORKSPACE.test(target)
+          !inWorkspace(target)
       )
     ) {
       return true
@@ -189,8 +194,7 @@ export function riskRule({ toolName, input }: ToolCallInfo): string | null {
 
 export function isJudged({ toolName, input }: ToolCallInfo) {
   if (toolName === "shell") return true
-  if (toolName === "fs_write")
-    return !WORKSPACE.test(field(input, "path") ?? "")
+  if (toolName === "fs_write") return !inWorkspace(field(input, "path") ?? "")
   if (toolName === "computer") {
     return screenActions(input).some(
       (action) => JUDGED_SCREEN.has(action.type) || submits(action)

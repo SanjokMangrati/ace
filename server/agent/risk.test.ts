@@ -23,6 +23,8 @@ describe("riskRule", () => {
     "sudo rm -rf /etc/nginx",
     "rm -rf ~",
     "cd /tmp && rm -rf /",
+    "rm -rf ../../etc",
+    "rm -rf /home/../etc",
     "dd if=/dev/zero of=/dev/sda",
   ])("flags %s", (command) => {
     expect(riskRule(shell(command))).not.toBeNull()
@@ -74,6 +76,9 @@ describe("isJudged", () => {
     expect(isJudged(shell("ls"))).toBe(true)
     expect(
       isJudged({ toolName: "fs_write", input: { path: "/etc/hosts" } })
+    ).toBe(true)
+    expect(
+      isJudged({ toolName: "fs_write", input: { path: "../../etc/hosts" } })
     ).toBe(true)
     expect(
       isJudged({ toolName: "fs_write", input: { path: "~/report.md" } })

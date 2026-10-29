@@ -73,29 +73,33 @@ function LiveScreen({
     Promise.all([
       callAction(() => openScreen(chatId, botId)),
       import("@novnc/novnc"),
-    ]).then(([result, { default: Client }]) => {
-      if (!active || !view.current) return
-      if (!result.ok) return setScreen("failed")
-      const client = new Client(view.current, result.url, {
-        wsProtocols: ["binary"],
+    ])
+      .then(([result, { default: Client }]) => {
+        if (!active || !view.current) return
+        if (!result.ok) return setScreen("failed")
+        const client = new Client(view.current, result.url, {
+          wsProtocols: ["binary"],
+        })
+        client.viewOnly = true
+        client.scaleViewport = true
+        client.qualityLevel = 9
+        client.background = "var(--color-screen)"
+        let live = false
+        client.addEventListener("connect", () => {
+          live = true
+          setScreen("live")
+        })
+        client.addEventListener("disconnect", () => {
+          if (!active) return
+          if (live) reconnect()
+          else setScreen("failed")
+        })
+        rfb = client
+        setSession(client)
       })
-      client.viewOnly = true
-      client.scaleViewport = true
-      client.qualityLevel = 9
-      client.background = "var(--color-screen)"
-      let live = false
-      client.addEventListener("connect", () => {
-        live = true
-        setScreen("live")
+      .catch(() => {
+        if (active) setScreen("failed")
       })
-      client.addEventListener("disconnect", () => {
-        if (!active) return
-        if (live) reconnect()
-        else setScreen("failed")
-      })
-      rfb = client
-      setSession(client)
-    })
     return () => {
       active = false
       rfb?.disconnect()
@@ -154,7 +158,7 @@ export function ScreenPanel({
   inControl: boolean
   working: boolean
   expanded: boolean
-  onHandedBack: (control: Required<ControlEvent>) => void
+  onHandedBack: (control: Required<ControlEvent>) => Promise<void>
   onToggleSize?: () => void
   onClose: () => void
 }) {
@@ -165,7 +169,7 @@ export function ScreenPanel({
   function giveBack() {
     run(async () => {
       const result = await giveBackControlOfScreen(chatId, teammate.id)
-      if (result.control && !working) onHandedBack(result.control)
+      if (result.control && !working) await onHandedBack(result.control)
       return result
     })
   }

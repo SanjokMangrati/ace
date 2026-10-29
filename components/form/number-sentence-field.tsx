@@ -7,7 +7,7 @@ import {
   type FieldPath,
   type FieldValues,
 } from "react-hook-form"
-import { FieldError } from "@/components/ui/field"
+import { Field, FieldError } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
 function format(value: unknown, decimals: number) {
@@ -93,11 +93,7 @@ export function NumberSentenceField<TValues extends FieldValues>({
       control={control}
       name={name}
       render={({ field, fieldState }) => (
-        <div
-          data-slot="field"
-          data-invalid={fieldState.invalid}
-          className="flex flex-col gap-1.5"
-        >
+        <Field data-invalid={fieldState.invalid}>
           <div className="flex flex-wrap items-center gap-2.5">
             <label id={beforeId} htmlFor={field.name}>
               {before}
@@ -115,7 +111,7 @@ export function NumberSentenceField<TValues extends FieldValues>({
             <span id={afterId}>{after}</span>
           </div>
           {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-        </div>
+        </Field>
       )}
     />
   )

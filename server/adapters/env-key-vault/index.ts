@@ -19,11 +19,10 @@ export function createEnvKeyVault(encodedKey: string): KeyVault {
         cipher.final(),
       ])
       const tag = cipher.getAuthTag()
-      return [version, iv, tag, data]
-        .map((part) =>
-          typeof part === "string" ? part : part.toString("base64url")
-        )
-        .join(".")
+      return [
+        version,
+        ...[iv, tag, data].map((part) => part.toString("base64url")),
+      ].join(".")
     },
     open(sealed) {
       const [prefix, iv, tag, data] = sealed.split(".")

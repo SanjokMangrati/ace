@@ -41,6 +41,7 @@ export function ModelField<TValues extends FieldValues>({
   onOpenChange?: (open: boolean) => void
 }) {
   const labelId = useId()
+  const valueId = useId()
   const [open, setOpen] = useState(false)
 
   function changeOpen(next: boolean) {
@@ -71,7 +72,7 @@ export function ModelField<TValues extends FieldValues>({
                   ref={field.ref}
                   disabled={disabled}
                   data-disabled={disabled || undefined}
-                  aria-labelledby={labelId}
+                  aria-labelledby={`${labelId} ${valueId}`}
                   aria-invalid={fieldState.invalid}
                   onBlur={field.onBlur}
                   className={selectTriggerClassName}
@@ -89,7 +90,7 @@ export function ModelField<TValues extends FieldValues>({
                 className: "w-(--anchor-width)",
               }}
             >
-              <span className="flex min-w-0 flex-col">
+              <span id={valueId} className="flex min-w-0 flex-col">
                 {selected ? (
                   <SelectOption
                     label={selected.label}

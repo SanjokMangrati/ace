@@ -42,6 +42,7 @@ export function SelectField<TValues extends FieldValues>({
   onValueChange?: (value: string) => void
 }) {
   const labelId = useId()
+  const valueId = useId()
 
   return (
     <Controller
@@ -63,11 +64,11 @@ export function SelectField<TValues extends FieldValues>({
             >
               <SelectTrigger
                 ref={field.ref}
-                aria-labelledby={labelId}
+                aria-labelledby={`${labelId} ${valueId}`}
                 aria-invalid={fieldState.invalid}
                 onBlur={field.onBlur}
               >
-                <SelectValue>
+                <SelectValue id={valueId}>
                   {selected ? (
                     <SelectOption
                       label={selected.label}

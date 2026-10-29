@@ -9,7 +9,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS schema
 COPY drizzle.config.ts tsconfig.json ./
 COPY server/db/schema ./server/db/schema
-CMD ["pnpm", "db:push"]
+CMD ["pnpm", "db:push", "--force"]
 
 FROM deps AS build
 COPY . .

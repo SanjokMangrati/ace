@@ -121,12 +121,13 @@ function providerModels(provider: Provider) {
   if (cached && Date.now() - cached.at < JUDGE_CHOICE_TTL_MS) {
     return cached.models
   }
-  const models = modelCatalog.list(provider).catch((error) => {
+  const listed = modelCatalog.list(provider).catch((error) => {
     log.warn("Model list unavailable", { provider, err: error })
+    providerModelCache.delete(provider)
     return []
   })
-  providerModelCache.set(provider, { models, at: Date.now() })
-  return models
+  providerModelCache.set(provider, { models: listed, at: Date.now() })
+  return listed
 }
 
 const NO_TOTALS: TurnTotals = {

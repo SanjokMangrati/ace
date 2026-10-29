@@ -15,6 +15,8 @@ describe("safeRedirect", () => {
     "https://evil.example",
     "//evil.example",
     "/\\evil.example",
+    "/\t/evil.example",
+    "/\n/evil.example",
   ])("falls back for %j", (target) => {
     expect(safeRedirect(target)).toBe("/")
   })
