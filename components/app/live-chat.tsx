@@ -12,6 +12,7 @@ import {
   useState,
 } from "react"
 import { chatStatuses } from "@/app/(app)/chats/actions"
+import { callAction } from "@/lib/action-client"
 
 export type LiveStatus = {
   working: boolean
@@ -88,9 +89,12 @@ export function ChatStatusSync({
   const busyIds = busy.map((chat) => chat.id).join()
 
   const check = useEffectEvent(async () => {
-    const statuses = await chatStatuses(busy.map((chat) => chat.id))
+    const result = await callAction(() =>
+      chatStatuses(busy.map((chat) => chat.id))
+    )
+    if (!result.ok) return
     const changed = busy.some((chat) => {
-      const now = statuses.find((status) => status.id === chat.id)
+      const now = result.statuses.find((status) => status.id === chat.id)
       return !now || !sameStatus(now, chat)
     })
     if (changed) router.refresh()

@@ -32,7 +32,8 @@ async function startDesktop(sandbox: DaytonaSandbox): Promise<Desktop> {
         scale,
         showCursor: true,
       })
-      return Buffer.from(shot.screenshot ?? "", "base64")
+      if (!shot.screenshot) throw new Error("The screen returned no picture.")
+      return Buffer.from(shot.screenshot, "base64")
     },
     click: async ({ x, y }, { button, clicks, modifiers }) => {
       await computerUse.mouse.click(x, y, button, undefined, clicks, modifiers)
