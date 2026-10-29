@@ -8,7 +8,7 @@ import { env } from "@/server/env"
 import { demo } from "./demo"
 
 const github =
-  !demo && env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+  !env.DEMO_MODE && env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
     ? {
         github: {
           clientId: env.GITHUB_CLIENT_ID,
@@ -23,7 +23,7 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: {
     enabled: true,
-    disableSignUp: env.DISABLE_SIGN_UP || !!demo,
+    disableSignUp: env.DISABLE_SIGN_UP || env.DEMO_MODE,
     minPasswordLength: PASSWORD_MIN_LENGTH,
     maxPasswordLength: PASSWORD_MAX_LENGTH,
   },

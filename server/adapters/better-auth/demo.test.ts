@@ -36,6 +36,13 @@ function signIn(password = DEMO_ACCOUNT.password) {
   return post("/sign-in/email", { email: DEMO_ACCOUNT.email, password })
 }
 
+function cookieOf(response: Response) {
+  return response.headers
+    .getSetCookie()
+    .map((line) => line.split(";")[0])
+    .join("; ")
+}
+
 describe("Better Auth in demo mode", () => {
   it("offers no sign-up and no GitHub", () => {
     expect(auth.signUpEnabled).toBe(false)
@@ -48,19 +55,14 @@ describe("Better Auth in demo mode", () => {
     expect(again.status).toBe(200)
     expect((await signIn("not the demo password")).status).toBe(401)
 
-    const cookie = again.headers
-      .getSetCookie()
-      .map((line) => line.split(";")[0])
-      .join("; ")
-    const session = await auth.getSession(new Headers({ cookie }))
+    const session = await auth.getSession(
+      new Headers({ cookie: cookieOf(again) })
+    )
     expect(session?.user.email).toBe(DEMO_ACCOUNT.email)
   })
 
   it("refuses new accounts and changes to the demo account", async () => {
-    const cookie = (await signIn()).headers
-      .getSetCookie()
-      .map((line) => line.split(";")[0])
-      .join("; ")
+    const cookie = cookieOf(await signIn())
 
     const signUp = await post("/sign-up/email", {
       name: "Sam",
